@@ -1,14 +1,13 @@
 package ru.insoft.archive.vkks.converter;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import javafx.application.Application;
+import javafx.event.EventHandler;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import javafx.stage.WindowEvent;
 import ru.insoft.archive.vkks.converter.control.ConverterController;
 
 /**
@@ -17,7 +16,6 @@ import ru.insoft.archive.vkks.converter.control.ConverterController;
  */
 public class ConverterUi extends Application {
 
-	private DriverManagerDataSource dataSource;
 
 	private Stage stage;
 
@@ -27,7 +25,8 @@ public class ConverterUi extends Application {
 		FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ConverterUi.fxml"));
 		Parent root = loader.load();
 
-		((ConverterController) loader.getController()).setApp(this);
+		ConverterController controller = (ConverterController) loader.getController();
+		controller.setApp(this);
 
 		stage.setTitle("Конвертер данных из ПИ \"Документооборот\" в ПИ \"Архивное дело\"");
 		stage.setScene(new Scene(root));
@@ -35,16 +34,15 @@ public class ConverterUi extends Application {
 		stage.setMinHeight(stage.getHeight());
 		stage.setMinWidth(stage.getWidth());
 
-		dataSource = dataSource = new DriverManagerDataSource();
-		dataSource.setDriverClassName("net.ucanaccess.jdbc.UcanaccessDriver");
+        stage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+          public void handle(WindowEvent we) {
+			  controller.savePrefs();
+          }
+      });
 	}
 
 	public static void main(String[] args) {
 		launch(args);
-	}
-
-	public DriverManagerDataSource getDataSource() {
-		return dataSource;
 	}
 
 	public Stage getStage() {
