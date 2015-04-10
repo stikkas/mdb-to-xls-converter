@@ -1,6 +1,7 @@
 package ru.insoft.archive.vkks.converter.control;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,7 +111,7 @@ public class ConverterController {
 
 		prefs = Preferences.userNodeForPackage(getClass());
 		String initDirectory = prefs.get(Config.INIT_DIR_KEY, null);
-		if (initDirectory != null) {
+		if (initDirectory != null && Files.isDirectory(Paths.get(initDirectory))) {
 			fileChooser.setInitialDirectory(new File(initDirectory));
 		}
 	}

@@ -14,9 +14,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javafx.application.Platform;
 import javafx.scene.control.TextArea;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
@@ -64,6 +66,7 @@ public class Worker extends Thread {
 			updateInfo("Не могу прочитать файл базы данных: " + ex.getMessage());
 		} finally {
 			dirsInWork.remove(xlsDir);
+			updateInfo(stat.toString());
 		}
 	}
 
@@ -119,7 +122,8 @@ public class Worker extends Thread {
 	 * @param path путь к файлу
 	 */
 	private void updateFile(Path path) {
-		updateInfo("Разбор данных из файла " + path);
+		updateInfo("Обработка файла " + path);
+		++stat.cases;
 
 		Workbook wb;
 
@@ -128,6 +132,7 @@ public class Worker extends Thread {
 		} catch (IOException ex) {
 			updateInfo("Ошибка при чтении файла " + path + ": " + ex.getMessage());
 			wb = null;
+			++stat.casesNotFound;
 		}
 
 		if (wb != null) {
@@ -162,11 +167,11 @@ public class Worker extends Thread {
 	private Connection connection;
 	private final String accessDbDir;
 	private String currentDirForFile;
-	private final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
+	private final Stat stat = new Stat();
+	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 
 	private void showResultForFileInfo(Path path, boolean errors) {
-		updateInfo("================================\n"
-				+ "Файл " + path + " обработан " + (errors ? " с ошибками." : " без ошибок."));
+		updateInfo("\nФайл " + path + " обработан " + (errors ? " с ошибками." : " без ошибок."));
 	}
 
 	/**
@@ -201,6 +206,7 @@ public class Worker extends Thread {
 		});
 
 		if (!getColumnIndeces(sheet, result)) {
+			++stat.casesNotFound;
 			throw new WrongFormat("На листе дела отсутствуют заголовки:" + getWrongHeaders(result));
 		}
 
@@ -208,6 +214,7 @@ public class Worker extends Thread {
 		PreparedStatement st = connection.prepareStatement(Config.CASE_ID_QUERY);
 		String caseNumber = row.getCell(result.get(Config.CASE_NUM_COL_HEADER), Row.CREATE_NULL_AS_BLANK).getStringCellValue();
 		if (caseNumber.isEmpty()) {
+			++stat.casesNotFound;
 			throw new WrongFormat("У дела отсутствует индекс");
 		}
 		st.setString(1, caseNumber);
@@ -217,10 +224,12 @@ public class Worker extends Thread {
 		try {
 			startDate = startCell.getDateCellValue();
 			if (startDate == null) {
+				++stat.casesNotFound;
 				throw new WrongFormat("отсутсвует " + Config.START_DATE_COL_HEADER);
 			}
 			endDate = endCell.getDateCellValue();
 			if (endDate == null) {
+				++stat.casesNotFound;
 				throw new WrongFormat("отсутсвует " + Config.END_DATE_COL_HEADER);
 			}
 		} catch (IllegalStateException ex) {
@@ -230,11 +239,13 @@ public class Worker extends Thread {
 
 		st.setDate(2, new Date(startDate.getTime()));
 		st.setDate(3, new Date(endDate.getTime()));
-
+		updateInfo("Производится поиск идентификатора дела по базе данных");
 		ResultSet rs = st.executeQuery();
 		if (rs.next()) {
+			++stat.casesFound;
 			return rs.getLong(1);
 		}
+		++stat.casesNotFound;
 		throw new CaseNotFound(caseNumber);
 	}
 
@@ -268,6 +279,7 @@ public class Worker extends Thread {
 		} catch (ParseException ex) {
 		}
 		if (date == null) {
+			++stat.casesNotFound;
 			throw new WrongFormat(fieldHeader + " имеет неправильный формат");
 		}
 		return date;
@@ -280,6 +292,7 @@ public class Worker extends Thread {
 	 * @param id - идентификатор дела (из базы)
 	 */
 	private void updateDocs(Sheet docs, Long id) throws WrongFormat, SQLException {
+		updateInfo("Обрабатываются документы");
 		Map<String, Short> result = new HashMap<>(Config.docXlsColumnNames.length);
 		for (String s : Config.docXlsColumnNames) {
 			result.put(s, null);
@@ -296,13 +309,17 @@ public class Worker extends Thread {
 		short typeDocNumColIdx = result.get(Config.DOC_TYPE);
 
 		for (int i = 1; i <= rows; ++i) {
+			++stat.docs;
 			Row row = docs.getRow(i);
 			String regNumber = row.getCell(regNumColIdx).getStringCellValue();
+			updateInfo("Обрабатывается документ " + regNumber);
 
 			st.setLong(1, id);
 			st.setString(2, regNumber);
+			updateInfo("Производится поиск документа " + regNumber + " в базе данных");
 			ResultSet rs = st.executeQuery();
 			if (rs.next()) {
+				++stat.docsFound;
 				String fileLink = rs.getString(1);
 				if (fileLink.isEmpty()) {
 					updateInfo("В базе данных отсутствует ссылка на файл для документа " + regNumber);
@@ -316,9 +333,10 @@ public class Worker extends Thread {
 				}
 				Path dstFile = dstDir.resolve(srcFile.getFileName());
 				if (!Files.exists(dstFile)) {
+					updateInfo("Копирование файла " + srcFile + " в " + dstFile);
 					try {
 						Files.copy(srcFile, dstFile);
-//						updateInfo("Файл " + srcFile + " скопирован в " + dstDir);
+						updateInfo("Файл " + srcFile + " скопирован в " + dstDir);
 					} catch (IOException ex) {
 						updateInfo("Ошибка копирования файла " + srcFile + " в "
 								+ dstDir + ": " + ex.getMessage());
@@ -327,22 +345,24 @@ public class Worker extends Thread {
 				} else {
 					updateInfo("Файл " + dstFile + " уже существует");
 				}
+				updateInfo("Изменение информации о документе в файле");
+				int startIndex = xlsDirPath.getNameCount();
+				int endIndex = dstFile.getNameCount();
 				String relativeDstFileName = FilenameUtils.separatorsToWindows(
-						dstFile.relativize(xlsDirPath).toString());
+						dstFile.subpath(startIndex, endIndex).toString());
 				Cell filesCell = row.getCell(filesNumColIdx);
 				String filesData = filesCell.getStringCellValue();
 				if (filesData.isEmpty()) {
-//					filesCell.setCellValue(relativeDstFileName);
-//					updateInfo("Для документа " + regNumber + " создана запись в поле 'Файлы'");
-					updateInfo("Имитация " + relativeDstFileName);
+					filesCell.setCellValue(relativeDstFileName);
+					updateInfo("Для документа " + regNumber + " создана запись в поле 'Файлы': " + relativeDstFileName);
 				} else if (!filesData.contains(relativeDstFileName)) {
-//					filesCell.setCellValue(filesData + ";" + relativeDstFileName);
-//					updateInfo("Для документа " + regNumber + " добавлена запись в поле 'Файлы'");
-					updateInfo("Имитация " + relativeDstFileName);
+					filesCell.setCellValue(filesData + ";" + relativeDstFileName);
+					updateInfo("Для документа " + regNumber + " добавлена запись в поле 'Файлы': " + relativeDstFileName);
 				} else {
 					updateInfo("Для документа " + regNumber + " запись в поле 'Файлы' не изменена");
 				}
 			} else {
+				++stat.docsNotFound;
 				updateInfo("Документ " + regNumber + " не найден");
 			}
 		}
@@ -395,6 +415,75 @@ public class Worker extends Thread {
 	 * @param message сообщение
 	 */
 	private void updateInfo(String message) {
-		logPanel.insertText(0, message + "\n");
+		Platform.runLater(() -> logPanel.insertText(0, message + "\n"));
 	}
+}
+
+class Stat {
+
+	/**
+	 * Кол-во обработанных дел
+	 */
+	long cases;
+	/**
+	 * Кол-во обработанных документов
+	 */
+	long docs;
+	/**
+	 * количество отождествлённых дел
+	 */
+	long casesFound;
+	/**
+	 * количество отождествлённых документов
+	 */
+	long docsFound;
+	/**
+	 * количество неотождествлённых дел
+	 */
+	long casesNotFound;
+	/**
+	 * количество неотождествлённых документов
+	 */
+	long docsNotFound;
+
+	private static final String casesLabel = "Обработанных дел";
+	private static final String docsLabel = "Обработанных документов";
+	private static final String casesFoundLabel = "Отождествленных дел";
+	private static final String docsFoundLabel = "Отождествленных документов";
+	private static final String casesNotFoundLabel = "Неотождествленных дел";
+	private static final String docsNotFoundLabel = "Неотождествленных документов";
+
+	private static final Map<String, Integer> labelsLengths = new HashMap<String, Integer>() {
+		{
+			put(casesLabel, casesLabel.length());
+			put(docsLabel, docsLabel.length());
+			put(casesFoundLabel, casesFoundLabel.length());
+			put(docsFoundLabel, docsFoundLabel.length());
+			put(casesNotFoundLabel, casesNotFoundLabel.length());
+			put(docsNotFoundLabel, docsNotFoundLabel.length());
+		}
+	};
+
+	private static final String formatString;
+
+	static {
+		int max = Collections.max(labelsLengths.values());
+		StringBuilder builder = new StringBuilder("\n");
+		labelsLengths.keySet().stream().forEach(key -> {
+			int diff = max - labelsLengths.get(key);
+			for (int i = 0; i < diff; ++i) {
+				builder.append("  ");
+			}
+			builder.append(key).append(":%15d\n");
+		});
+
+		formatString = builder.toString();
+	}
+
+	@Override
+	public String toString() {
+		return String.format(formatString, cases, docs, casesFound,
+				docsFound, casesNotFound, docsNotFound);
+	}
+
 }
