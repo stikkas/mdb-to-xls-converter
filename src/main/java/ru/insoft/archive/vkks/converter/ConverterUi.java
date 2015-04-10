@@ -16,7 +16,6 @@ import ru.insoft.archive.vkks.converter.control.ConverterController;
  */
 public class ConverterUi extends Application {
 
-
 	private Stage stage;
 
 	@Override
@@ -34,11 +33,14 @@ public class ConverterUi extends Application {
 		stage.setMinHeight(stage.getHeight());
 		stage.setMinWidth(stage.getWidth());
 
-        stage.setOnCloseRequest(new EventHandler<WindowEvent>() {
-          public void handle(WindowEvent we) {
-			  controller.savePrefs();
-          }
-      });
+		stage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+			public void handle(WindowEvent we) {
+				try {
+					controller.savePrefs();
+				} catch (Exception e) {
+				}
+			}
+		});
 	}
 
 	public static void main(String[] args) {
