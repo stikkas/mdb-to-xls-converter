@@ -3,9 +3,6 @@ package ru.insoft.archive.vkks.converter.control;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.prefs.Preferences;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -27,7 +24,6 @@ public class ConverterController {
 	private FileChooser fileChooser;
 	private DirectoryChooser dirChooser;
 	private Preferences prefs;
-	private final List<String> dirsInWork = Collections.synchronizedList(new ArrayList());
 
 	@FXML
 	private TextArea logPanel;
@@ -44,12 +40,8 @@ public class ConverterController {
 	@FXML
 	private void onExec() {
 		String dir = dataDirEdit.getText();
-		// Если уже обрабатываем эту директорию, то ничего не делаем
-		if (!dirsInWork.contains(dir)) {
-			dirsInWork.add(dir);
-			new Worker(dir, dbFileEdit.getText(), logPanel, dirsInWork)
-					.start();
-		}
+		new Worker(dir, dbFileEdit.getText(), logPanel)
+				.start();
 	}
 
 	@FXML

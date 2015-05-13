@@ -1,32 +1,34 @@
 package ru.insoft.archive.vkks.converter;
 
+import com.itextpdf.text.pdf.PdfReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.ResultSet;
 import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import javafx.application.Platform;
 import javafx.scene.control.TextArea;
+import javax.persistence.EntityManager;
+import javax.persistence.Persistence;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
-import ru.insoft.archive.vkks.converter.error.CaseNotFound;
+import static ru.insoft.archive.vkks.converter.Config.dbPrefix;
+import ru.insoft.archive.vkks.converter.domain.Delo;
+import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.error.WrongFormat;
 
 /**
@@ -37,132 +39,16 @@ import ru.insoft.archive.vkks.converter.error.WrongFormat;
  */
 public class Worker extends Thread {
 
-	public Worker(String xlsDir, String accessDb, TextArea logPanel, List<String> dirsInWork) {
-		this.xlsDir = xlsDir;
-		this.accessDb = accessDb;
-		this.logPanel = logPanel;
-		this.dirsInWork = dirsInWork;
-		accessDbDir = Paths.get(accessDb).getParent().toString();
-		xlsDirPath = Paths.get(xlsDir);
+	private enum ValueType {
+
+		STRING, INTEGER, CALENDAR, CALENDAR1
 	}
 
-	@Override
-	public void run() {
-		try {
-			Config.dataSource.setUrl(Config.dbPrefix + accessDb);
-			connection = Config.dataSource.getConnection();
-			DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(xlsDir));
-			updateInfo("Обрабатываю данные в директории " + xlsDir);
-			stream.forEach(e -> {
-				String fileName = e.getFileName().toString();
-				if (fileName.toLowerCase().endsWith(".xls")) {
-					currentDirForFile = fileName.substring(0, fileName.length() - 4);
-					updateFile(e);
-				}
-			});
-		} catch (IOException ex) {
-			updateInfo("Не могу открыть директорию с xls файлами (" + xlsDir + "): " + ex.getMessage());
-		} catch (SQLException ex) {
-			updateInfo("Не могу прочитать файл базы данных: " + ex.getMessage());
-		} finally {
-			dirsInWork.remove(xlsDir);
-			updateInfo(stat.toString());
-		}
-	}
-
-	/**
-	 * Обновляет xls файл.
-	 * <p>
-	 * Один файл содержит два листа:
-	 * <ol>
-	 * <li>Дело</li>
-	 * <li>Документы</li>
-	 * </ol></p>
-	 * <p>
-	 * Лист "Дело" имеет на первой строке:</p>
-	 * <table border=1>
-	 * <tr>
-	 * <th>Индекс дела</th>
-	 * <th>Заголовок дела</th>
-	 * <th>№ тома</th>
-	 * <th>№ части</th>
-	 * <th>Дата дела с</th>
-	 * <th>Дата дела по	</th>
-	 * <th>Примечание</th>
-	 * </tr>
-	 * </table>
-	 * <p>
-	 * На второй строке находятся данные по делу. Каждый файл содержит только
-	 * одно дело</p>
-	 * <p>
-	 * MIN_PRIORITY Лист "Документы" имеет на первой строке:</p>
-	 * <table border=1>
-	 * <tr>
-	 * <th>№ регистрации</th>
-	 * <th>Дата регистрации</th>
-	 * <th>Исходящий №</th>
-	 * <th>Дата исходящего</th>
-	 * <th>Краткое содержание</th>
-	 * <th>Состав</th>
-	 * <th>Гриф доступа</th>
-	 * <th>Количество листов</th>
-	 * <th>Примечание</th>
-	 * <th>Файлы</th>
-	 * <th>Наименование вида</th>
-	 * <th>Вид документа</th>
-	 * <th>Том №</th>
-	 * <th>Страница №</th>
-	 * </tr>
-	 * </table>
-	 * <p>
-	 * Каждая следующая строка предоставляет собой данные по одному документу.
-	 * Первая пустая строка (точнее первая пустая колонка какого-то ряда)
-	 * считается концом листа</p>
-	 *
-	 * @param path путь к файлу
-	 */
-	private void updateFile(Path path) {
-		updateInfo("Обработка файла " + path);
-		++stat.cases;
-
-		Workbook wb;
-
-		try (InputStream is = Files.newInputStream(path)) {
-			wb = new HSSFWorkbook(is);
-		} catch (IOException ex) {
-			updateInfo("Ошибка при чтении файла " + path + ": " + ex.getMessage());
-			wb = null;
-			++stat.casesNotFound;
-		}
-
-		if (wb != null) {
-			boolean errors = false;
-			try {
-				updateDocs(wb.getSheet("Документы"), getCaseId(wb.getSheet("Дело")));
-				OutputStream out = Files.newOutputStream(path);
-				wb.write(out);
-				out.close();
-			} catch (WrongFormat ex) {
-				updateInfo("Ошибка обработки файла " + path + ": " + ex.getMessage());
-				errors = true;
-			} catch (SQLException ex) {
-				updateInfo("Ошибка базы данных: " + ex.getMessage());
-				errors = true;
-			} catch (CaseNotFound ex) {
-				updateInfo("Данные по делу '" + ex.getCaseNumber() + "' отсутсвуют");
-				errors = true;
-			} catch (IOException ex) {
-				updateInfo("Ошибка при записи файла " + path + ": " + ex.getMessage());
-				errors = true;
-			}
-			showResultForFileInfo(path, errors);
-		}
-	}
+	private final Set<String> createdFileNames = new HashSet<>();
 
 	private final String xlsDir;
+	private final EntityManager em;
 	private final Path xlsDirPath;
-	private final String accessDb;
-	private final List<String> dirsInWork;
 	private final TextArea logPanel;
 	private Connection connection;
 	private final String accessDbDir;
@@ -170,225 +56,213 @@ public class Worker extends Thread {
 	private final Stat stat = new Stat();
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 
-	private void showResultForFileInfo(Path path, boolean errors) {
-		updateInfo("\nФайл " + path + " обработан " + (errors ? " с ошибками." : " без ошибок."));
+	public Worker(String xlsDir, String accessDb, TextArea logPanel) {
+		this.xlsDir = xlsDir;
+
+		Properties props = new Properties();
+		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
+		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
+		this.logPanel = logPanel;
+		accessDbDir = Paths.get(accessDb).getParent().toString();
+		xlsDirPath = Paths.get(xlsDir);
 	}
 
-	/**
-	 * Получает индексы колонок с интересующими названиями
-	 */
-	private boolean getColumnIndeces(Sheet sheet, Map<String, Short> result) {
-		Row header = sheet.getRow(0);
-		short lastIndexCol = header.getLastCellNum();
-		short i = header.getFirstCellNum();
-		int found = 0;
-		for (; i <= lastIndexCol; ++i) {
-			String name = header.getCell(i, Row.CREATE_NULL_AS_BLANK).getStringCellValue();
-			if (result.containsKey(name)) {
-				result.put(name, i);
-				++found;
-			}
-		}
-		return found == result.size();
-	}
-
-	/**
-	 * Возвращает идентификатор дела из базы, орентируясь на данные из xls
-	 * файла.
-	 *
-	 * @param sheet лист с делом
-	 * @return идентификатор дела
-	 */
-	private Long getCaseId(Sheet sheet) throws WrongFormat, CaseNotFound, SQLException {
-		Map<String, Short> result = new HashMap<>(Config.caseXlsDbColumns.size());
-		Config.caseXlsDbColumns.keySet().stream().forEach(st -> {
-			result.put(st, null);
-		});
-
-		if (!getColumnIndeces(sheet, result)) {
-			++stat.casesNotFound;
-			throw new WrongFormat("На листе дела отсутствуют заголовки:" + getWrongHeaders(result));
-		}
-
-		Row row = sheet.getRow(1);
-		PreparedStatement st = connection.prepareStatement(Config.CASE_ID_QUERY);
-		String caseNumber = row.getCell(result.get(Config.CASE_NUM_COL_HEADER), Row.CREATE_NULL_AS_BLANK).getStringCellValue();
-		if (caseNumber.isEmpty()) {
-			++stat.casesNotFound;
-			throw new WrongFormat("У дела отсутствует индекс");
-		}
-		st.setString(1, caseNumber);
-		java.util.Date startDate, endDate;
-		Cell startCell = row.getCell(result.get(Config.START_DATE_COL_HEADER), Row.CREATE_NULL_AS_BLANK);
-		Cell endCell = row.getCell(result.get(Config.END_DATE_COL_HEADER), Row.CREATE_NULL_AS_BLANK);
-		try {
-			startDate = startCell.getDateCellValue();
-			if (startDate == null) {
-				++stat.casesNotFound;
-				throw new WrongFormat("отсутсвует " + Config.START_DATE_COL_HEADER);
-			}
-			endDate = endCell.getDateCellValue();
-			if (endDate == null) {
-				++stat.casesNotFound;
-				throw new WrongFormat("отсутсвует " + Config.END_DATE_COL_HEADER);
-			}
-		} catch (IllegalStateException ex) {
-			startDate = getStartEndDate(Config.START_DATE_COL_HEADER, startCell);
-			endDate = getStartEndDate(Config.END_DATE_COL_HEADER, endCell);
-		}
-
-		st.setDate(2, new Date(startDate.getTime()));
-		st.setDate(3, new Date(endDate.getTime()));
-		updateInfo("Производится поиск идентификатора дела по базе данных");
-		ResultSet rs = st.executeQuery();
-		if (rs.next()) {
-			++stat.casesFound;
-			return rs.getLong(1);
-		}
-		++stat.casesNotFound;
-		throw new CaseNotFound(caseNumber);
-	}
-
-	/**
-	 * Определяет какие заголовки не найдены на листе
-	 *
-	 * @param headers список необходимых заголовков
-	 * @return строку с пустыми заголовками
-	 */
-	private String getWrongHeaders(Map<String, Short> headers) {
-		StringBuilder builder = new StringBuilder();
-		headers.keySet().stream().filter((key) -> (headers.get(key) == null)).forEach((key) -> {
-			builder.append(" '").append(key).append("' ");
-		});
-		return builder.toString();
-	}
-
-	/**
-	 * Получает дату из ячейки, в которой дата записана строкой
-	 *
-	 * @param fieldHeader название столбца
-	 * @param cell ячейчка с данными
-	 * @return дату
-	 * @throws WrongFormat
-	 */
-	private java.util.Date getStartEndDate(String fieldHeader, Cell cell) throws WrongFormat {
-		String data = cell.getStringCellValue();
-		java.util.Date date = null;
-		try {
-			date = sdf.parse(data);
-		} catch (ParseException ex) {
-		}
-		if (date == null) {
-			++stat.casesNotFound;
-			throw new WrongFormat(fieldHeader + " имеет неправильный формат");
-		}
-		return date;
-	}
-
-	/**
-	 * Обновляет данные по документам (вставляет в ячейку "Файлы" путь к pdf).
-	 *
-	 * @param docs - лист с информацией по документам
-	 * @param id - идентификатор дела (из базы)
-	 */
-	private void updateDocs(Sheet docs, Long id) throws WrongFormat, SQLException {
-		updateInfo("Обрабатываются документы");
-		Map<String, Short> result = new HashMap<>(Config.docXlsColumnNames.length);
-		for (String s : Config.docXlsColumnNames) {
-			result.put(s, null);
-		}
-		if (!getColumnIndeces(docs, result)) {
-			throw new WrongFormat("На листе документов отсутсвуют заголовки:" + getWrongHeaders(result));
-		}
-
-		int rows = docs.getLastRowNum();
-		PreparedStatement st = connection.prepareStatement(Config.DOC_FILE_QUERY);
-
-		short regNumColIdx = result.get(Config.DOC_REG_NUM);
-		short filesNumColIdx = result.get(Config.DOC_FILES);
-		short typeDocNumColIdx = result.get(Config.DOC_TYPE);
-
-		for (int i = 1; i <= rows; ++i) {
-			++stat.docs;
-			Row row = docs.getRow(i);
-			String regNumber = row.getCell(regNumColIdx).getStringCellValue();
-			updateInfo("Обрабатывается документ " + regNumber);
-
-			st.setLong(1, id);
-			st.setString(2, regNumber);
-			updateInfo("Производится поиск документа " + regNumber + " в базе данных");
-			ResultSet rs = st.executeQuery();
-			if (rs.next()) {
-				++stat.docsFound;
-				String fileLink = rs.getString(1);
-				if (fileLink.isEmpty()) {
-					updateInfo("В базе данных отсутствует ссылка на файл для документа " + regNumber);
-					continue;
+	@Override
+	public void run() {
+		((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
+			++stat.cases;
+			String caseNumber = null;
+			try {
+				caseNumber = d.getCaseNumber();
+				if (caseNumber == null || caseNumber.trim().isEmpty()) {
+					throw new WrongFormat("Отсутствует номер дела");
 				}
-				Path srcFile = getPathForLink(fileLink);
-				Path dstDir = getDstDir(row.getCell(
-						typeDocNumColIdx, Row.CREATE_NULL_AS_BLANK).getStringCellValue());
-				if (dstDir == null) {
-					continue;
+				Calendar start = d.getDateStart();
+				Calendar end = d.getDateEnd();
+				if (start == null || end == null) {
+					++stat.casesSkip;
+					return;
 				}
-				Path dstFile = dstDir.resolve(srcFile.getFileName());
+				String fileName = caseNumber + "_"
+						+ sdf.format(start.getTime()) + "-"
+						+ sdf.format(end.getTime());
+
+				while (createdFileNames.contains(fileName)) {
+					fileName += "_1";
+				}
+
+				createdFileNames.add(fileName);
+
+				Path fileXls = Paths.get(xlsDir, fileName + ".xls");
+				Path pdfDir = Paths.get(xlsDir, fileName);
+				Files.createDirectories(pdfDir);
+				createDelo(d, fileXls, pdfDir);
+				++stat.casesCreated;
+			} catch (IOException ex) {
+				updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
+			} catch (WrongFormat ex) {
+				updateInfo(ex.getMessage());
+			}
+		});
+		updateInfo(stat.toString());
+	}
+
+	/**
+	 * Создает файл с делом
+	 *
+	 * @param d дело
+	 * @param file путь к xls файлу
+	 * @param pdfDir директория для pdf файлов дела
+	 */
+	private void createDelo(Delo d, Path file, Path pdfDir) {
+
+		Workbook wb = new HSSFWorkbook();
+		fillDeloSheet(wb, wb.createSheet("Дело"), d);
+		fillDocsSheet(wb, wb.createSheet("Документы"), d.getDocuments(), pdfDir);
+
+		try (OutputStream ous = Files.newOutputStream(file)) {
+			wb.write(ous);
+		} catch (IOException ex) {
+			updateInfo("Не могу создать файл " + file + ": " + ex.getMessage());
+		}
+	}
+
+	/**
+	 * Заполняет страницу дел
+	 */
+	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo) {
+		setHeaders(Config.deloHeaders, wb, sheet);
+
+		Row row = sheet.createRow(1);
+		setCellValue(row.createCell(0), delo.getCaseNumber(), ValueType.STRING);
+		setCellValue(row.createCell(1), delo.getDeloTitle(), ValueType.STRING);
+		setCellValue(row.createCell(2), delo.getNumberTom(), ValueType.INTEGER);
+		setCellValue(row.createCell(3), delo.getNumberPart(), ValueType.INTEGER);
+		setCellValue(row.createCell(4), delo.getDateStart(), ValueType.CALENDAR);
+		setCellValue(row.createCell(5), delo.getDateEnd(), ValueType.CALENDAR);
+		setCellValue(row.createCell(6), delo.getRemarkDelo(), ValueType.STRING);
+	}
+
+	/**
+	 * Заполняет страницу документов
+	 */
+	private void fillDocsSheet(Workbook wb, Sheet sheet, List<Document> documents, Path pdfDir) {
+		setHeaders(Config.docHeaders, wb, sheet);
+
+		CellStyle dateStyle = wb.createCellStyle();
+		DataFormat df = wb.createDataFormat();
+		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
+
+		int size = documents.size();
+		for (int i = 0; i < size; ++i) {
+			createDocRecord(sheet.createRow(i + 1), documents.get(i), dateStyle, pdfDir);
+		}
+	}
+
+	/**
+	 * Устанавливает значение для ячейки, если значение null - то ничего не
+	 * делает.
+	 */
+	private void setCellValue(Cell cell, Object value, ValueType type, CellStyle style) {
+		cell.setCellStyle(style);
+		setCellValue(cell, value, type);
+	}
+
+	/**
+	 * Устанавливает значение ячейки 
+	 */
+	private void setCellValue(Cell cell, Object value, ValueType type) {
+		if (value != null) {
+			switch (type) {
+				case STRING:
+					cell.setCellValue((String) value);
+					break;
+				case INTEGER:
+					cell.setCellValue((Integer) value);
+					break;
+				case CALENDAR:
+					cell.setCellType(Cell.CELL_TYPE_NUMERIC);
+					cell.setCellValue(sdf.format(((Calendar) value).getTime()));
+				case CALENDAR1:
+					cell.setCellValue(sdf.format(((Calendar) value).getTime()));
+			}
+		}
+	}
+
+	/**
+	 * Создает запись для документа
+	 *
+	 * @param row
+	 * @param doc
+	 */
+	private void createDocRecord(Row row, Document doc, CellStyle style, Path pdfDir) {
+		if (doc.getPageS() == null || doc.getPageS().trim().isEmpty()) {
+			++stat.docsSkip;
+			return;
+		}
+		++stat.docs;
+		setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
+		setCellValue(row.createCell(1), doc.getDateDoc(), ValueType.CALENDAR1, style);
+		row.createCell(2);
+		row.createCell(3);
+		row.createCell(4).setCellValue(doc.getDocTitle());
+		row.createCell(5);
+		row.createCell(6);
+		setCellValue(row.createCell(8), doc.getRemarkDocument(), ValueType.STRING);
+		String graph = doc.getGraph();
+		if (graph != null) {
+			Path srcFile = getPathForLink(graph);
+			int pages = getPagesOfPdf(srcFile.toString());
+			if (pages != 0) {
+
+				Path dstFile = pdfDir.resolve(srcFile.getFileName());
 				if (!Files.exists(dstFile)) {
-					updateInfo("Копирование файла " + srcFile + " в " + dstFile);
 					try {
 						Files.copy(srcFile, dstFile);
-						updateInfo("Файл " + srcFile + " скопирован в " + dstDir);
 					} catch (IOException ex) {
 						updateInfo("Ошибка копирования файла " + srcFile + " в "
-								+ dstDir + ": " + ex.getMessage());
-						continue;
+								+ pdfDir + ": " + ex.getMessage());
 					}
 				} else {
 					updateInfo("Файл " + dstFile + " уже существует");
 				}
-				updateInfo("Изменение информации о документе в файле");
 				int startIndex = xlsDirPath.getNameCount();
 				int endIndex = dstFile.getNameCount();
 				String relativeDstFileName = FilenameUtils.separatorsToWindows(
 						dstFile.subpath(startIndex, endIndex).toString());
-				Cell filesCell = row.getCell(filesNumColIdx);
-				String filesData = filesCell.getStringCellValue();
-				if (filesData.isEmpty()) {
-					filesCell.setCellValue(relativeDstFileName);
-					updateInfo("Для документа " + regNumber + " создана запись в поле 'Файлы': " + relativeDstFileName);
-				} else if (!filesData.contains(relativeDstFileName)) {
-					filesCell.setCellValue(filesData + ";" + relativeDstFileName);
-					updateInfo("Для документа " + regNumber + " добавлена запись в поле 'Файлы': " + relativeDstFileName);
-				} else {
-					updateInfo("Для документа " + regNumber + " запись в поле 'Файлы' не изменена");
-				}
-			} else {
-				++stat.docsNotFound;
-				updateInfo("Документ " + regNumber + " не найден");
+				setCellValue(row.createCell(9), relativeDstFileName, ValueType.STRING);
+				row.createCell(7).setCellValue(pages);
 			}
+		} else {
+			row.createCell(9);
 		}
+		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
+		row.createCell(11);
+		row.createCell(12);
+		row.createCell(13);
 	}
 
 	/**
-	 * Возвращает директорию, куда нужно поместить файл. В xls файле путь
-	 * представлен в Windows формате.
+	 * Создает заголовки для листа
 	 *
-	 * @param typeDoc вид документа, отсюда определяется относительный путь,
-	 * если присутствует
-	 * @return путь назначения
+	 * @param headers
+	 * @param wb
+	 * @param sheet
 	 */
-	private Path getDstDir(String typeDoc) {
-		if (typeDoc.isEmpty()) {
-			try {
-				Path p = Paths.get(currentDirForFile);
-				Files.createDirectories(p);
-				return p;
-			} catch (IOException ex) {
-				updateInfo("Ошибка создания директории " + currentDirForFile
-						+ ": " + ex.getMessage());
-				return null;
-			}
+	private void setHeaders(String[] headers, Workbook wb, Sheet sheet) {
+		CellStyle style = wb.createCellStyle();
+		Font font = wb.createFont();
+		font.setFontHeightInPoints((short) 10);
+		font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+		style.setFont(font);
+		style.setAlignment(CellStyle.ALIGN_CENTER);
+
+		Row row = sheet.createRow(0);
+		for (int i = 0; i < headers.length; ++i) {
+			Cell cell = row.createCell(i);
+			cell.setCellValue(headers[i]);
+			cell.setCellStyle(style);
 		}
-		return Paths.get(xlsDir, Paths.get(FilenameUtils.separatorsToSystem(typeDoc)).toFile().getParent());
 	}
 
 	/**
@@ -410,6 +284,21 @@ public class Worker extends Thread {
 	}
 
 	/**
+	 * Получает кол-во страниц в pdf документе
+	 *
+	 * @param filename имя файла
+	 * @return количество страниц
+	 */
+	private int getPagesOfPdf(String filename) {
+		try {
+			return new PdfReader(filename).getNumberOfPages();
+		} catch (IOException ex) {
+			updateInfo("Невозможно получить кол-во страниц " + filename + ": " + ex.getMessage());
+			return 0;
+		}
+	}
+
+	/**
 	 * Пишет информацию о ходе выполнения в статустую панель.
 	 *
 	 * @param message сообщение
@@ -426,64 +315,27 @@ class Stat {
 	 */
 	long cases;
 	/**
-	 * Кол-во обработанных документов
+	 * Кол-во созданных записей документов
 	 */
 	long docs;
 	/**
-	 * количество отождествлённых дел
+	 * Кол-во пропущеных документов
 	 */
-	long casesFound;
+	long docsSkip;
 	/**
-	 * количество отождествлённых документов
+	 * Кол-во пропущеных дел
 	 */
-	long docsFound;
+	long casesSkip;
 	/**
-	 * количество неотождествлённых дел
+	 * Кол-во созданных файлов дел
 	 */
-	long casesNotFound;
-	/**
-	 * количество неотождествлённых документов
-	 */
-	long docsNotFound;
-
-	private static final String casesLabel = "Обработанных дел";
-	private static final String docsLabel = "Обработанных документов";
-	private static final String casesFoundLabel = "Отождествленных дел";
-	private static final String docsFoundLabel = "Отождествленных документов";
-	private static final String casesNotFoundLabel = "Неотождествленных дел";
-	private static final String docsNotFoundLabel = "Неотождествленных документов";
-
-	private static final Map<String, Integer> labelsLengths = new HashMap<String, Integer>() {
-		{
-			put(casesLabel, casesLabel.length());
-			put(docsLabel, docsLabel.length());
-			put(casesFoundLabel, casesFoundLabel.length());
-			put(docsFoundLabel, docsFoundLabel.length());
-			put(casesNotFoundLabel, casesNotFoundLabel.length());
-			put(docsNotFoundLabel, docsNotFoundLabel.length());
-		}
-	};
-
-	private static final String formatString;
-
-	static {
-		int max = Collections.max(labelsLengths.values());
-		StringBuilder builder = new StringBuilder("\n");
-		labelsLengths.keySet().stream().forEach(key -> {
-			int diff = max - labelsLengths.get(key);
-			for (int i = 0; i < diff; ++i) {
-				builder.append("  ");
-			}
-			builder.append(key).append(":%15d\n");
-		});
-
-		formatString = builder.toString();
-	}
+	long casesCreated;
 
 	@Override
 	public String toString() {
-		return String.format(formatString, cases, docs, casesFound,
-				docsFound, casesNotFound, docsNotFound);
+		return String.format("Обработано дел - %d\n"
+				+ "Создано xls файлов - %d\nПропущено дел - %d\nЗаписано документов - %d\n"
+				+ "Пропущено документов - %d\n", cases, casesCreated, casesSkip, docs, docsSkip);
 	}
 
 }

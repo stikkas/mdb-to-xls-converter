@@ -4,7 +4,6 @@
 <?import java.lang.*?>
 <?import javafx.scene.layout.*?>
 
-
 <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="377.0" prefWidth="552.0" xmlns="http://javafx.com/javafx/8.0.40" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.insoft.archive.vkks.converter.control.ConverterController">
    <children>
       <GridPane hgap="5.0" layoutX="7.0" layoutY="25.0" prefHeight="58.0" prefWidth="542.0" vgap="5.0" AnchorPane.leftAnchor="5.0" AnchorPane.rightAnchor="5.0" AnchorPane.topAnchor="5.0">
@@ -18,10 +17,10 @@
           <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
         </rowConstraints>
          <children>
-            <Label text="Папка с данными:" />
+            <Label text="Результат:" />
             <Label text="MS Access DB файл:" GridPane.rowIndex="1" />
-            <TextField fx:id="dataDirEdit" editable="false" GridPane.columnIndex="1" />
-            <TextField fx:id="dbFileEdit" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            <TextField fx:id="dataDirEdit" editable="false" promptText="Выберите папку для сохранения данных" GridPane.columnIndex="1" />
+            <TextField fx:id="dbFileEdit" editable="false" promptText="Выберите файл с данными" GridPane.columnIndex="1" GridPane.rowIndex="1" />
             <Button mnemonicParsing="false" onAction="#chooseDataDir" text="Выбрать" GridPane.columnIndex="2" />
             <Button mnemonicParsing="false" onAction="#chooseDBFile" text="Выбрать" GridPane.columnIndex="2" GridPane.rowIndex="1" />
          </children>

@@ -27,7 +27,7 @@ public class ConverterUi extends Application {
 		ConverterController controller = (ConverterController) loader.getController();
 		controller.setApp(this);
 
-		stage.setTitle("Конвертер данных из ПИ \"Документооборот\" в ПИ \"Архивное дело\"");
+		stage.setTitle("Конвертер данных из MDB в XLS");
 		stage.setScene(new Scene(root));
 		stage.show();
 		stage.setMinHeight(stage.getHeight());
