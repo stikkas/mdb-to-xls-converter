@@ -154,8 +154,15 @@ public class Worker extends Thread {
 		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
 
 		int size = documents.size();
+		int rowNumber = 1;
 		for (int i = 0; i < size; ++i) {
-			createDocRecord(sheet.createRow(i + 1), documents.get(i), dateStyle, pdfDir);
+			Document doc = documents.get(i);
+			if (doc.getPageS() == null) {
+				++stat.docsSkip;
+				continue;
+			}
+			createDocRecord(sheet.createRow(rowNumber++), doc, dateStyle, pdfDir);
+			++stat.docs;
 		}
 	}
 
@@ -169,7 +176,7 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Устанавливает значение ячейки 
+	 * Устанавливает значение ячейки
 	 */
 	private void setCellValue(Cell cell, Object value, ValueType type) {
 		if (value != null) {
@@ -196,11 +203,6 @@ public class Worker extends Thread {
 	 * @param doc
 	 */
 	private void createDocRecord(Row row, Document doc, CellStyle style, Path pdfDir) {
-		if (doc.getPageS() == null || doc.getPageS().trim().isEmpty()) {
-			++stat.docsSkip;
-			return;
-		}
-		++stat.docs;
 		setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
 		setCellValue(row.createCell(1), doc.getDateDoc(), ValueType.CALENDAR1, style);
 		row.createCell(2);

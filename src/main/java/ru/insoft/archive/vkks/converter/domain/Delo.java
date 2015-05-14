@@ -1,6 +1,5 @@
 package ru.insoft.archive.vkks.converter.domain;
 
-import com.sun.istack.internal.NotNull;
 import java.io.Serializable;
 import java.util.Calendar;
 import java.util.List;
@@ -24,7 +23,6 @@ public class Delo implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	@Id
-	@NotNull
 	@Column(name = "ID")
 	private Integer id;
 

@@ -1,11 +1,12 @@
 package ru.insoft.archive.vkks.converter.domain;
 
-import com.sun.istack.internal.NotNull;
 import java.io.Serializable;
 import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.Objects;
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
@@ -23,46 +24,33 @@ public class Document implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	@Id
-	@NotNull
-	@Column(name = "ID1")
 	private Integer id;
 
-	@JoinColumn(name = "PARENT_ID", referencedColumnName = "ID", insertable = false, updatable = false)
-	@ManyToOne
 	private Delo delo;
 
-	@Column(name = "DOC_NUMBER", insertable = false, updatable = false)
 	private String docNumber;
 
-	@Column(name = "DATE_DOC", insertable = false, updatable = false)
-	@Temporal(TemporalType.TIMESTAMP)
 	private Calendar dateDoc;
 
-	@Column(name = "DOC_TYPE", insertable = false, updatable = false)
 	private String docType;
 
-	@Column(name = "DOC_TITLE", insertable = false, updatable = false)
 	private String docTitle;
 
-	@Column(name = "PAGE_S", insertable = false, updatable = false)
 	private String pageS;
 
-	@Column(name = "PAGE PO", insertable = false, updatable = false)
 	private Integer pagePo;
 
-	@Column(name = "PAGE", insertable = false, updatable = false)
 	private Integer page;
 
-	@Column(name = "REMARK_DOCUMENT", insertable = false, updatable = false)
 	private String remarkDocument;
 
-	@Column(name = "GRAPH", insertable = false, updatable = false)
 	private String graph;
 
 	public Document() {
 	}
 
+	@Id
+	@Column(name = "ID1")
 	public Integer getId() {
 		return id;
 	}
@@ -71,6 +59,8 @@ public class Document implements Serializable {
 		this.id = id;
 	}
 
+	@JoinColumn(name = "PARENT_ID", referencedColumnName = "ID", insertable = false, updatable = false)
+	@ManyToOne(fetch = FetchType.EAGER)
 	public Delo getDelo() {
 		return delo;
 	}
@@ -79,7 +69,11 @@ public class Document implements Serializable {
 		this.delo = delo;
 	}
 
+	@Column(name = "DOC_NUMBER", insertable = false, updatable = false)
 	public String getDocNumber() {
+		if (docNumber == null || docNumber.trim().isEmpty()) {
+			return "1000";
+		}
 		return docNumber;
 	}
 
@@ -87,7 +81,15 @@ public class Document implements Serializable {
 		this.docNumber = docNumber;
 	}
 
+	@Column(name = "DATE_DOC", insertable = false, updatable = false)
+	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getDateDoc() {
+		if (dateDoc == null) {
+			Calendar cal = GregorianCalendar.getInstance();
+			cal.set(1111, 10, 11);
+			return cal;
+		}
+
 		return dateDoc;
 	}
 
@@ -95,6 +97,7 @@ public class Document implements Serializable {
 		this.dateDoc = dateDoc;
 	}
 
+	@Column(name = "DOC_TYPE", insertable = false, updatable = false)
 	public String getDocType() {
 		return docType;
 	}
@@ -103,7 +106,11 @@ public class Document implements Serializable {
 		this.docType = docType;
 	}
 
+	@Column(name = "DOC_TITLE", insertable = false, updatable = false)
 	public String getDocTitle() {
+		if (docTitle == null || docTitle.trim().isEmpty()) {
+			return delo.getDeloTitle();
+		}
 		return docTitle;
 	}
 
@@ -111,6 +118,7 @@ public class Document implements Serializable {
 		this.docTitle = docTitle;
 	}
 
+	@Column(name = "PAGE_S", insertable = false, updatable = false)
 	public String getPageS() {
 		return pageS;
 	}
@@ -119,6 +127,7 @@ public class Document implements Serializable {
 		this.pageS = pageS;
 	}
 
+	@Column(name = "PAGE PO", insertable = false, updatable = false)
 	public Integer getPagePo() {
 		return pagePo;
 	}
@@ -127,6 +136,7 @@ public class Document implements Serializable {
 		this.pagePo = pagePo;
 	}
 
+	@Column(name = "PAGE", insertable = false, updatable = false)
 	public Integer getPage() {
 		return page;
 	}
@@ -135,6 +145,7 @@ public class Document implements Serializable {
 		this.page = page;
 	}
 
+	@Column(name = "REMARK_DOCUMENT", insertable = false, updatable = false)
 	public String getRemarkDocument() {
 		return remarkDocument;
 	}
@@ -143,6 +154,7 @@ public class Document implements Serializable {
 		this.remarkDocument = remarkDocument;
 	}
 
+	@Column(name = "GRAPH", insertable = false, updatable = false)
 	public String getGraph() {
 		return graph;
 	}
@@ -170,5 +182,4 @@ public class Document implements Serializable {
 		return Objects.equals(id, other.id);
 	}
 
-	
 }
