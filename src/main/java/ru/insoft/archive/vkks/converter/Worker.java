@@ -44,15 +44,15 @@ public class Worker extends Thread {
 		STRING, INTEGER, CALENDAR, CALENDAR1
 	}
 
+	private boolean end = false;
+
 	private final Set<String> createdFileNames = new HashSet<>();
 
 	private final String xlsDir;
 	private final EntityManager em;
 	private final Path xlsDirPath;
 	private final TextArea logPanel;
-	private Connection connection;
 	private final String accessDbDir;
-	private String currentDirForFile;
 	private final Stat stat = new Stat();
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 
@@ -67,41 +67,51 @@ public class Worker extends Thread {
 		xlsDirPath = Paths.get(xlsDir);
 	}
 
+	/**
+	 * Устанавливает признак завершения работы
+	 */
+	public void cancel() {
+		end = true;
+	}
+
 	@Override
 	public void run() {
 		((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
-			++stat.cases;
-			String caseNumber = null;
-			try {
-				caseNumber = d.getCaseNumber();
-				if (caseNumber == null || caseNumber.trim().isEmpty()) {
-					throw new WrongFormat("Отсутствует номер дела");
-				}
-				Calendar start = d.getDateStart();
-				Calendar end = d.getDateEnd();
-				if (start == null || end == null) {
-					++stat.casesSkip;
-					return;
-				}
-				String fileName = caseNumber + "_"
-						+ sdf.format(start.getTime()) + "-"
-						+ sdf.format(end.getTime());
+			if (!end) {
+				++stat.cases;
+				String caseNumber = null;
+				try {
+					caseNumber = d.getCaseNumber();
+					if (caseNumber == null || caseNumber.trim().isEmpty()) {
+						throw new WrongFormat("Отсутствует номер дела");
+					}
+					Calendar start = d.getDateStart();
+					Calendar end = d.getDateEnd();
+					if (start == null || end == null) {
+						++stat.casesSkip;
+						return;
+					}
+					String fileName = caseNumber + "_"
+							+ sdf.format(start.getTime()) + "-"
+							+ sdf.format(end.getTime());
 
-				while (createdFileNames.contains(fileName)) {
-					fileName += "_1";
+					while (createdFileNames.contains(fileName)) {
+						fileName += "_1";
+					}
+
+					createdFileNames.add(fileName);
+
+					Path fileXls = Paths.get(xlsDir, fileName + ".xls");
+					Path pdfDir = Paths.get(xlsDir, fileName);
+					Files.createDirectories(pdfDir);
+					createDelo(d, fileXls, pdfDir);
+					updateInfo("Создано дело с номером " + caseNumber);
+					++stat.casesCreated;
+				} catch (IOException ex) {
+					updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
+				} catch (WrongFormat ex) {
+					updateInfo(ex.getMessage());
 				}
-
-				createdFileNames.add(fileName);
-
-				Path fileXls = Paths.get(xlsDir, fileName + ".xls");
-				Path pdfDir = Paths.get(xlsDir, fileName);
-				Files.createDirectories(pdfDir);
-				createDelo(d, fileXls, pdfDir);
-				++stat.casesCreated;
-			} catch (IOException ex) {
-				updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
-			} catch (WrongFormat ex) {
-				updateInfo(ex.getMessage());
 			}
 		});
 		updateInfo(stat.toString());

@@ -27,5 +27,6 @@
       </GridPane>
       <Button fx:id="execButton" disable="true" layoutX="373.0" layoutY="251.0" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#onExec" prefWidth="114.0" text="Выполнить" AnchorPane.bottomAnchor="5.0" AnchorPane.rightAnchor="4.0" />
       <TextArea fx:id="logPanel" layoutX="176.0" layoutY="103.0" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="40.0" AnchorPane.leftAnchor="5.0" AnchorPane.rightAnchor="5.0" AnchorPane.topAnchor="70.0" />
+      <Button layoutX="34.0" layoutY="346.0" mnemonicParsing="false" onAction="#onCancel" text="Прервать" AnchorPane.bottomAnchor="5.0" AnchorPane.leftAnchor="5.0" />
    </children>
 </AnchorPane>

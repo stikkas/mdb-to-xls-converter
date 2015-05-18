@@ -3,6 +3,8 @@ package ru.insoft.archive.vkks.converter.control;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.prefs.Preferences;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -10,6 +12,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
+import javafx.util.Pair;
 import ru.insoft.archive.vkks.converter.Config;
 import ru.insoft.archive.vkks.converter.ConverterUi;
 import ru.insoft.archive.vkks.converter.Worker;
@@ -24,6 +27,7 @@ public class ConverterController {
 	private FileChooser fileChooser;
 	private DirectoryChooser dirChooser;
 	private Preferences prefs;
+	private static final Map<Pair<String, String>, Worker> runningWorkers = new HashMap<>();
 
 	@FXML
 	private TextArea logPanel;
@@ -40,8 +44,27 @@ public class ConverterController {
 	@FXML
 	private void onExec() {
 		String dir = dataDirEdit.getText();
-		new Worker(dir, dbFileEdit.getText(), logPanel)
-				.start();
+		String dbFile = dbFileEdit.getText();
+		Pair p = new Pair(dir, dbFile);
+		if (runningWorkers.containsKey(p)) {
+			logPanel.insertText(0, "Процесс для файла данных [" + dbFile
+					+ "] и папки назначения [" + dir + "] уже запущен.\n");
+		} else {
+			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
+					+ "]. Результат будет помещен в [" + dir + "].\n");
+			Worker w = new Worker(dir, dbFileEdit.getText(), logPanel);
+			runningWorkers.put(p, w);
+			w.start();
+		}
+	}
+
+	@FXML
+	private void onCancel() {
+		runningWorkers.forEach((k, v) -> {
+			if (v.isAlive())
+				v.cancel();
+		});
+		runningWorkers.clear();
 	}
 
 	@FXML
