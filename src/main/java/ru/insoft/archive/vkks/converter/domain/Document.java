@@ -109,7 +109,7 @@ public class Document implements Serializable {
 	@Column(name = "DOC_TITLE", insertable = false, updatable = false)
 	public String getDocTitle() {
 		if (docTitle == null || docTitle.trim().isEmpty()) {
-			return delo.getDeloTitle();
+			return docType;
 		}
 		return docTitle;
 	}

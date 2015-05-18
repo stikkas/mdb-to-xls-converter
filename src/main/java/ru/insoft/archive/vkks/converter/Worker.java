@@ -241,7 +241,7 @@ public class Worker extends Thread {
 		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
 		row.createCell(11);
 		row.createCell(12);
-		row.createCell(13);
+		row.createCell(13).setCellValue(doc.getPageS());
 	}
 
 	/**

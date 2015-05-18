@@ -11,6 +11,10 @@ import javafx.stage.WindowEvent;
 import ru.insoft.archive.vkks.converter.control.ConverterController;
 
 /**
+ * Другая версия: 1. Если отсутствует значение в поле "Заголовок документа"
+ * (Doc_title), то кладем значение из поля "Тип документа" (Doc_type) 2.
+ * Необходимо в столбец "Страница №" (файл xls) сохранить значение из поля
+ * "Страница с" (Page_s)
  *
  * @author Благодатских С.
  */
@@ -27,7 +31,7 @@ public class ConverterUi extends Application {
 		ConverterController controller = (ConverterController) loader.getController();
 		controller.setApp(this);
 
-		stage.setTitle("Конвертер данных из MDB в XLS");
+		stage.setTitle("Конвертер данных из MDB в XLS (doc_title empty ? doc_type : doc_title; Page_s -> Страница №)");
 		stage.setScene(new Scene(root));
 		stage.show();
 		stage.setMinHeight(stage.getHeight());
