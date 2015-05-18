@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.prefs.Preferences;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.stage.DirectoryChooser;
@@ -42,6 +43,9 @@ public class ConverterController {
 	private Button execButton;
 
 	@FXML
+	private CheckBox opis;
+
+	@FXML
 	private void onExec() {
 		String dir = dataDirEdit.getText();
 		String dbFile = dbFileEdit.getText();
@@ -52,7 +56,7 @@ public class ConverterController {
 		} else {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
 					+ "]. Результат будет помещен в [" + dir + "].\n");
-			Worker w = new Worker(dir, dbFileEdit.getText(), logPanel);
+			Worker w = new Worker(dir, dbFileEdit.getText(), logPanel, opis.isSelected());
 			runningWorkers.put(p, w);
 			w.start();
 		}

@@ -6,7 +6,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.Connection;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.HashSet;
@@ -29,7 +28,6 @@ import org.apache.poi.ss.usermodel.Workbook;
 import static ru.insoft.archive.vkks.converter.Config.dbPrefix;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
-import ru.insoft.archive.vkks.converter.error.WrongFormat;
 
 /**
  * Обрабатывает xls файлы, сопоставляя их с данными в базе. Также копирует pdf
@@ -44,10 +42,11 @@ public class Worker extends Thread {
 		STRING, INTEGER, CALENDAR, CALENDAR1
 	}
 
-	private boolean end = false;
+	private boolean commit = false;
 
 	private final Set<String> createdFileNames = new HashSet<>();
 
+	private final boolean opis;
 	private final String xlsDir;
 	private final EntityManager em;
 	private final Path xlsDirPath;
@@ -56,7 +55,7 @@ public class Worker extends Thread {
 	private final Stat stat = new Stat();
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 
-	public Worker(String xlsDir, String accessDb, TextArea logPanel) {
+	public Worker(String xlsDir, String accessDb, TextArea logPanel, boolean opis) {
 		this.xlsDir = xlsDir;
 
 		Properties props = new Properties();
@@ -65,56 +64,119 @@ public class Worker extends Thread {
 		this.logPanel = logPanel;
 		accessDbDir = Paths.get(accessDb).getParent().toString();
 		xlsDirPath = Paths.get(xlsDir);
+		this.opis = opis;
 	}
 
 	/**
 	 * Устанавливает признак завершения работы
 	 */
 	public void cancel() {
-		end = true;
+		commit = true;
 	}
 
 	@Override
 	public void run() {
-		((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
-			if (!end) {
-				++stat.cases;
-				String caseNumber = null;
+		if (opis) {
+			createOpis();
+		} else {
+			((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
+				if (!commit) {
+					++stat.cases;
+					String caseNumber = null;
+					try {
+						if (checkCaseNumber(d)) {
+							String fileName = getDirNameForDocuments(d);
+							Path fileXls = Paths.get(xlsDir, fileName + ".xls");
+							Path pdfDir = Paths.get(xlsDir, fileName);
+							Files.createDirectories(pdfDir);
+							createDelo(d, fileXls, pdfDir);
+							updateInfo("Создано дело с номером " + caseNumber);
+							++stat.casesCreated;
+						}
+					} catch (IOException ex) {
+						updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
+					}
+				}
+			});
+		}
+		updateInfo(stat.toString());
+	}
+
+	/**
+	 * Создает файл с описью
+	 */
+	private void createOpis() {
+		Workbook wb = new HSSFWorkbook();
+		Sheet sheet = wb.createSheet("Дело");
+		setHeaders(Config.deloHeaders, wb, sheet);
+		List<Delo> delas = em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList();
+		int size = delas.size();
+		int row = 1;
+		for (int i = 0; i < size; ++i) {
+			if (commit) {
+				break;
+			}
+			Delo d = delas.get(i);
+			if (checkCaseNumber(d)) {
+				String caseNumber = d.getCaseNumber();
+				String fileName = getDirNameForDocuments(d);
+				Path pdfDir = Paths.get(xlsDir, fileName);
 				try {
-					caseNumber = d.getCaseNumber();
-					if (caseNumber == null || caseNumber.trim().isEmpty()) {
-						throw new WrongFormat("Отсутствует номер дела");
-					}
-					Calendar start = d.getDateStart();
-					Calendar end = d.getDateEnd();
-					if (start == null || end == null) {
-						++stat.casesSkip;
-						return;
-					}
-					String fileName = caseNumber + "_"
-							+ sdf.format(start.getTime()) + "-"
-							+ sdf.format(end.getTime());
-
-					while (createdFileNames.contains(fileName)) {
-						fileName += "_1";
-					}
-
-					createdFileNames.add(fileName);
-
-					Path fileXls = Paths.get(xlsDir, fileName + ".xls");
-					Path pdfDir = Paths.get(xlsDir, fileName);
 					Files.createDirectories(pdfDir);
-					createDelo(d, fileXls, pdfDir);
+					fillDeloSheet(wb, sheet, d, row++);
+					fillDocsSheet(wb, wb.createSheet("Документы"), d.getDocuments(), pdfDir);
 					updateInfo("Создано дело с номером " + caseNumber);
 					++stat.casesCreated;
 				} catch (IOException ex) {
 					updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
-				} catch (WrongFormat ex) {
-					updateInfo(ex.getMessage());
 				}
 			}
-		});
-		updateInfo(stat.toString());
+		}
+		try (OutputStream ous = Files.newOutputStream(Paths.get(xlsDir, "opis.xls"))) {
+			wb.write(ous);
+		} catch (IOException ex) {
+			updateInfo("Не могу создать файл opis.xls: " + ex.getMessage());
+		}
+
+	}
+
+	/**
+	 * Проверяет правильность дела
+	 *
+	 * @param d дело
+	 * @return в случае отсутствия номера или одной из дат, дело считается
+	 * неправильным и пропускается
+	 */
+	private boolean checkCaseNumber(Delo d) {
+		String caseNumber = d.getCaseNumber();
+		if (caseNumber == null || caseNumber.trim().isEmpty()) {
+			return false;
+		}
+		if (d.getDateStart() == null || d.getDateEnd() == null) {
+			++stat.casesSkip;
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Возвращает название папки куда будут складываться документы дела
+	 *
+	 * @param d дело
+	 * @return
+	 */
+	private String getDirNameForDocuments(Delo d) {
+		String fileName = d.getCaseNumber() + "_"
+				+ sdf.format(d.getDateStart().getTime()) + "-"
+				+ sdf.format(d.getDateEnd().getTime());
+
+		while (createdFileNames.contains(fileName)) {
+			fileName += "_1";
+		}
+
+		createdFileNames.add(fileName);
+		return fileName;
 	}
 
 	/**
@@ -127,9 +189,19 @@ public class Worker extends Thread {
 	private void createDelo(Delo d, Path file, Path pdfDir) {
 
 		Workbook wb = new HSSFWorkbook();
-		fillDeloSheet(wb, wb.createSheet("Дело"), d);
+		Sheet sheet = wb.createSheet("Дело");
+		setHeaders(Config.deloHeaders, wb, sheet);
+		fillDeloSheet(wb, sheet, d, 1);
+
 		fillDocsSheet(wb, wb.createSheet("Документы"), d.getDocuments(), pdfDir);
 
+		writeData(wb, file);
+	}
+
+	/**
+	 * Записывает данные в файл xls
+	 */
+	private void writeData(Workbook wb, Path file) {
 		try (OutputStream ous = Files.newOutputStream(file)) {
 			wb.write(ous);
 		} catch (IOException ex) {
@@ -140,10 +212,8 @@ public class Worker extends Thread {
 	/**
 	 * Заполняет страницу дел
 	 */
-	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo) {
-		setHeaders(Config.deloHeaders, wb, sheet);
-
-		Row row = sheet.createRow(1);
+	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo, int rowNumber) {
+		Row row = sheet.createRow(rowNumber);
 		setCellValue(row.createCell(0), delo.getCaseNumber(), ValueType.STRING);
 		setCellValue(row.createCell(1), delo.getDeloTitle(), ValueType.STRING);
 		setCellValue(row.createCell(2), delo.getNumberTom(), ValueType.INTEGER);
