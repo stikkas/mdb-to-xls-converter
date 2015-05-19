@@ -85,11 +85,14 @@ public class Worker extends Thread {
 					String caseNumber = null;
 					try {
 						if (checkCaseNumber(d)) {
+							caseNumber = d.getCaseNumber();
+
 							String fileName = getDirNameForDocuments(d);
 							Path fileXls = Paths.get(xlsDir, fileName + ".xls");
 							Path pdfDir = Paths.get(xlsDir, fileName);
 							Files.createDirectories(pdfDir);
 							createDelo(d, fileXls, pdfDir);
+							
 							updateInfo("Создано дело с номером " + caseNumber);
 							++stat.casesCreated;
 						}
@@ -116,6 +119,7 @@ public class Worker extends Thread {
 			if (commit) {
 				break;
 			}
+			++stat.cases;
 			Delo d = delas.get(i);
 			if (checkCaseNumber(d)) {
 				String caseNumber = d.getCaseNumber();
@@ -123,8 +127,9 @@ public class Worker extends Thread {
 				Path pdfDir = Paths.get(xlsDir, fileName);
 				try {
 					Files.createDirectories(pdfDir);
-					fillDeloSheet(wb, sheet, d, row++);
-					fillDocsSheet(wb, wb.createSheet("Документы"), d.getDocuments(), pdfDir);
+					fillDeloSheet(wb, sheet, d, row);
+					fillDocsSheet(wb, wb.createSheet("Документы" + row), d.getDocuments(), pdfDir);
+					++row;
 					updateInfo("Создано дело с номером " + caseNumber);
 					++stat.casesCreated;
 				} catch (IOException ex) {
@@ -416,7 +421,7 @@ class Stat {
 	@Override
 	public String toString() {
 		return String.format("Обработано дел - %d\n"
-				+ "Создано xls файлов - %d\nПропущено дел - %d\nЗаписано документов - %d\n"
+				+ "Создано дел - %d\nПропущено дел - %d\nЗаписано документов - %d\n"
 				+ "Пропущено документов - %d\n", cases, casesCreated, casesSkip, docs, docsSkip);
 	}
 
