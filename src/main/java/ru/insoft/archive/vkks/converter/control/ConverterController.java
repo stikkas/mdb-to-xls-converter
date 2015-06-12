@@ -5,12 +5,20 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.prefs.Preferences;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.util.Pair;
@@ -28,7 +36,22 @@ public class ConverterController {
 	private FileChooser fileChooser;
 	private DirectoryChooser dirChooser;
 	private Preferences prefs;
+	/**
+	* Количество запущенных процессов конвертации
+	*/
+	private final ObjectProperty<AtomicInteger> countWorkers = new SimpleObjectProperty<>(new AtomicInteger(0));
+
+	/**
+	 * Запущенные процессы конвертации, нужны для операции прерывания и для отслеживания 
+	 * попытки запустить один и тотже процесс дважды.
+	 */
 	private static final Map<Pair<String, String>, Worker> runningWorkers = new HashMap<>();
+
+	@FXML
+	private Spinner<Integer> caseId;
+
+	@FXML
+	private CheckBox allCasesCheck;
 
 	@FXML
 	private TextArea logPanel;
@@ -43,7 +66,24 @@ public class ConverterController {
 	private Button execButton;
 
 	@FXML
-	private CheckBox opis;
+	private Button saveLogButton;
+
+	@FXML
+	private Button cancelButton;
+
+	/**
+	 * Формировать для каждого дела отдельный файл
+	 */
+	@FXML
+	private RadioButton everyRadio;
+
+	/**
+	 * Формировать для одного года одного дела один файл
+	 */
+	@FXML
+	private RadioButton groupRadio;
+
+	private final ToggleGroup formatDst = new ToggleGroup();
 
 	@FXML
 	private void onExec() {
@@ -56,17 +96,32 @@ public class ConverterController {
 		} else {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
 					+ "]. Результат будет помещен в [" + dir + "].\n");
-			Worker w = new Worker(dir, dbFileEdit.getText(), logPanel, opis.isSelected());
+			Worker w = new Worker(dir, dbFileEdit.getText(), logPanel, false);
 			runningWorkers.put(p, w);
+			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
+			w.doneProperty().addListener(e -> {
+				countWorkers.set(new AtomicInteger(countWorkers.get().decrementAndGet()));
+				runningWorkers.remove(p);
+			});
 			w.start();
 		}
 	}
 
 	@FXML
+	private void onSaveLog() {
+
+	}
+
+	/**
+	 * При нажатии на кнопку "Прервать" выполняется завершение всех рабочих
+	 * процессов При этом дается возможность обработать до конца начатые дела.
+	 */
+	@FXML
 	private void onCancel() {
 		runningWorkers.forEach((k, v) -> {
-			if (v.isAlive())
+			if (v.isAlive()) {
 				v.cancel();
+			}
 		});
 		runningWorkers.clear();
 	}
@@ -101,7 +156,7 @@ public class ConverterController {
 		fileChooser = new FileChooser();
 		fileChooser.getExtensionFilters().
 				add(new FileChooser.ExtensionFilter("MS Access DB", "*.mdb"));
-		fileChooser.setTitle("Выбор файла с данными");
+		fileChooser.setTitle("Выбор файла mdb с данными");
 	}
 
 	/**
@@ -109,7 +164,7 @@ public class ConverterController {
 	 */
 	private void createDirChooser() {
 		dirChooser = new DirectoryChooser();
-		dirChooser.setTitle("Выбор директории с исходными файлами");
+		dirChooser.setTitle("Выбор директории для сохранения сконвертированных данных");
 	}
 
 	/**
@@ -128,11 +183,39 @@ public class ConverterController {
 		fileChooser.initialDirectoryProperty().bindBidirectional(
 				dirChooser.initialDirectoryProperty());
 
+		// Выбираем сохраненный путь к последней выбранной папке
 		prefs = Preferences.userNodeForPackage(getClass());
 		String initDirectory = prefs.get(Config.INIT_DIR_KEY, null);
 		if (initDirectory != null && Files.isDirectory(Paths.get(initDirectory))) {
 			fileChooser.setInitialDirectory(new File(initDirectory));
 		}
+
+		formatDst.getToggles().addAll(everyRadio, groupRadio);
+
+		everyRadio.disableProperty().bind(caseId.disableProperty().not());
+		groupRadio.disableProperty().bind(caseId.disableProperty().not());
+		caseId.disableProperty().bind(allCasesCheck.selectedProperty());
+
+		// Настройка выбора только числовых значения для ID дела
+		caseId.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, Integer.MAX_VALUE));
+		caseId.getEditor().textProperty().addListener(e -> {
+			Integer value = 1;
+			try {
+				value = Integer.parseInt(caseId.getEditor().getText());
+			} catch (NumberFormatException ex) {
+				caseId.getEditor().setText(value.toString());
+			}
+			caseId.getValueFactory().setValue(value);
+		});
+
+		execButton.setTooltip(new Tooltip("Начать конвертацию выбранных данных"));
+		cancelButton.setTooltip(new Tooltip("Прервать конвертацию всех данных"));
+		saveLogButton.setTooltip(new Tooltip("Создать файл отчета работы конвертора"));
+
+		saveLogButton.disableProperty().bind(logPanel.textProperty().isEmpty());
+		countWorkers.addListener(e -> {
+			cancelButton.setDisable(countWorkers.get().get() <= 0);
+		});
 	}
 
 	public void setApp(ConverterUi app) {

@@ -12,7 +12,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.control.TextArea;
 import javax.persistence.EntityManager;
 import javax.persistence.Persistence;
@@ -46,6 +50,11 @@ public class Worker extends Thread {
 
 	private final Set<String> createdFileNames = new HashSet<>();
 
+	/**
+	 * Сигнализирует о завершении работы
+	 */
+	private final BooleanProperty done = new SimpleBooleanProperty(false);
+
 	private final boolean opis;
 	private final String xlsDir;
 	private final EntityManager em;
@@ -76,33 +85,42 @@ public class Worker extends Thread {
 
 	@Override
 	public void run() {
-		if (opis) {
-			createOpis();
-		} else {
-			((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
-				if (!commit) {
-					++stat.cases;
-					String caseNumber = null;
-					try {
-						if (checkCaseNumber(d)) {
-							caseNumber = d.getCaseNumber();
+		try {
+			sleep(10000);
+		/*	
+			if (opis) {
+				createOpis();
+			} else {
+				((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
+					if (!commit) {
+						++stat.cases;
+						String caseNumber = null;
+						try {
+							if (checkCaseNumber(d)) {
+								caseNumber = d.getCaseNumber();
 
-							String fileName = getDirNameForDocuments(d);
-							Path fileXls = Paths.get(xlsDir, fileName + ".xls");
-							Path pdfDir = Paths.get(xlsDir, fileName);
-							Files.createDirectories(pdfDir);
-							createDelo(d, fileXls, pdfDir);
-							
-							updateInfo("Создано дело с номером " + caseNumber);
-							++stat.casesCreated;
+								String fileName = getDirNameForDocuments(d);
+								Path fileXls = Paths.get(xlsDir, fileName + ".xls");
+								Path pdfDir = Paths.get(xlsDir, fileName);
+								Files.createDirectories(pdfDir);
+								createDelo(d, fileXls, pdfDir);
+
+								updateInfo("Создано дело с номером " + caseNumber);
+								++stat.casesCreated;
+							}
+						} catch (IOException ex) {
+							updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
 						}
-					} catch (IOException ex) {
-						updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
 					}
-				}
-			});
+				});
+			}
+			*/
+		} catch (InterruptedException ex) {
+			Logger.getLogger(Worker.class.getName()).log(Level.SEVERE, null, ex);
+		} finally {
+			updateInfo(stat.toString());
+			done.set(true);
 		}
-		updateInfo(stat.toString());
 	}
 
 	/**
@@ -157,7 +175,7 @@ public class Worker extends Thread {
 		if (caseNumber == null || caseNumber.trim().isEmpty()) {
 			return false;
 		}
-		if (d.getDateStart() == null || d.getDateEnd() == null) {
+		if (d.getStartDate() == null || d.getEndDate() == null) {
 			++stat.casesSkip;
 			return false;
 		}
@@ -173,8 +191,8 @@ public class Worker extends Thread {
 	 */
 	private String getDirNameForDocuments(Delo d) {
 		String fileName = d.getCaseNumber() + "_"
-				+ sdf.format(d.getDateStart().getTime()) + "-"
-				+ sdf.format(d.getDateEnd().getTime());
+				+ sdf.format(d.getStartDate().getTime()) + "-"
+				+ sdf.format(d.getEndDate().getTime());
 
 		while (createdFileNames.contains(fileName)) {
 			fileName += "_1";
@@ -220,12 +238,12 @@ public class Worker extends Thread {
 	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo, int rowNumber) {
 		Row row = sheet.createRow(rowNumber);
 		setCellValue(row.createCell(0), delo.getCaseNumber(), ValueType.STRING);
-		setCellValue(row.createCell(1), delo.getDeloTitle(), ValueType.STRING);
-		setCellValue(row.createCell(2), delo.getNumberTom(), ValueType.INTEGER);
+		setCellValue(row.createCell(1), delo.getCaseTitle(), ValueType.STRING);
+		setCellValue(row.createCell(2), delo.getTomNumber(), ValueType.INTEGER);
 		setCellValue(row.createCell(3), delo.getNumberPart(), ValueType.INTEGER);
-		setCellValue(row.createCell(4), delo.getDateStart(), ValueType.CALENDAR);
-		setCellValue(row.createCell(5), delo.getDateEnd(), ValueType.CALENDAR);
-		setCellValue(row.createCell(6), delo.getRemarkDelo(), ValueType.STRING);
+		setCellValue(row.createCell(4), delo.getStartDate(), ValueType.CALENDAR);
+		setCellValue(row.createCell(5), delo.getEndDate(), ValueType.CALENDAR);
+		setCellValue(row.createCell(6), delo.getCaseRemark(), ValueType.STRING);
 	}
 
 	/**
@@ -242,7 +260,7 @@ public class Worker extends Thread {
 		int rowNumber = 1;
 		for (int i = 0; i < size; ++i) {
 			Document doc = documents.get(i);
-			if (doc.getPageS() == null) {
+			if (doc.getStartPage() == null) {
 				++stat.docsSkip;
 				continue;
 			}
@@ -289,14 +307,14 @@ public class Worker extends Thread {
 	 */
 	private void createDocRecord(Row row, Document doc, CellStyle style, Path pdfDir) {
 		setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
-		setCellValue(row.createCell(1), doc.getDateDoc(), ValueType.CALENDAR1, style);
+		setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
 		row.createCell(2);
 		row.createCell(3);
 		row.createCell(4).setCellValue(doc.getDocTitle());
 		row.createCell(5);
 		row.createCell(6);
-		setCellValue(row.createCell(8), doc.getRemarkDocument(), ValueType.STRING);
-		String graph = doc.getGraph();
+		setCellValue(row.createCell(8), doc.getDocRemark(), ValueType.STRING);
+		String graph = doc.getPrikGraph();
 		if (graph != null) {
 			Path srcFile = getPathForLink(graph);
 			int pages = getPagesOfPdf(srcFile.toString());
@@ -326,7 +344,7 @@ public class Worker extends Thread {
 		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
 		row.createCell(11);
 		row.createCell(12);
-		row.createCell(13).setCellValue(doc.getPageS());
+		row.createCell(13).setCellValue(doc.getStartPage());
 	}
 
 	/**
@@ -392,6 +410,10 @@ public class Worker extends Thread {
 	 */
 	private void updateInfo(String message) {
 		Platform.runLater(() -> logPanel.insertText(0, message + "\n"));
+	}
+
+	public BooleanProperty doneProperty() {
+		return done;
 	}
 }
 

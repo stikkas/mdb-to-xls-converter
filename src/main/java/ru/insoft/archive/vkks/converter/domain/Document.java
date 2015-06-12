@@ -19,7 +19,7 @@ import javax.persistence.TemporalType;
  * @author Благодатских С.
  */
 @Entity
-@Table(name = "DOCUMENT")
+@Table(name = "Document")
 public class Document implements Serializable {
 
 	private static final long serialVersionUID = 1L;
@@ -30,21 +30,23 @@ public class Document implements Serializable {
 
 	private String docNumber;
 
-	private Calendar dateDoc;
+	private Calendar docDate;
 
 	private String docType;
 
 	private String docTitle;
 
-	private String pageS;
+	private Short startPage;
 
-	private Integer pagePo;
+	private Short endPage;
 
-	private Integer page;
+	private Short docPages;
 
-	private String remarkDocument;
+	private String docRemark;
 
-	private String graph;
+	private String prikGraph;
+
+	private String dopGraph;
 
 	public Document() {
 	}
@@ -69,7 +71,7 @@ public class Document implements Serializable {
 		this.delo = delo;
 	}
 
-	@Column(name = "DOC_NUMBER", insertable = false, updatable = false)
+	@Column(name = "doc_number", insertable = false, updatable = false)
 	public String getDocNumber() {
 		if (docNumber == null || docNumber.trim().isEmpty()) {
 			return "1000";
@@ -81,23 +83,23 @@ public class Document implements Serializable {
 		this.docNumber = docNumber;
 	}
 
-	@Column(name = "DATE_DOC", insertable = false, updatable = false)
+	@Column(name = "doc_date", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
-	public Calendar getDateDoc() {
-		if (dateDoc == null) {
+	public Calendar getDocDate() {
+		if (docDate == null) {
 			Calendar cal = GregorianCalendar.getInstance();
 			cal.set(1111, 10, 11);
 			return cal;
 		}
 
-		return dateDoc;
+		return docDate;
 	}
 
-	public void setDateDoc(Calendar dateDoc) {
-		this.dateDoc = dateDoc;
+	public void setDocDate(Calendar docDate) {
+		this.docDate = docDate;
 	}
 
-	@Column(name = "DOC_TYPE", insertable = false, updatable = false)
+	@Column(name = "doc_type", insertable = false, updatable = false)
 	public String getDocType() {
 		return docType;
 	}
@@ -106,7 +108,7 @@ public class Document implements Serializable {
 		this.docType = docType;
 	}
 
-	@Column(name = "DOC_TITLE", insertable = false, updatable = false)
+	@Column(name = "doc_title", insertable = false, updatable = false)
 	public String getDocTitle() {
 		if (docTitle == null || docTitle.trim().isEmpty()) {
 			return docType;
@@ -118,49 +120,58 @@ public class Document implements Serializable {
 		this.docTitle = docTitle;
 	}
 
-	@Column(name = "PAGE_S", insertable = false, updatable = false)
-	public String getPageS() {
-		return pageS;
+	@Column(name = "start_page", insertable = false, updatable = false)
+	public Short getStartPage() {
+		return startPage;
 	}
 
-	public void setPageS(String pageS) {
-		this.pageS = pageS;
+	public void setStartPage(Short startPage) {
+		this.startPage = startPage;
 	}
 
-	@Column(name = "PAGE PO", insertable = false, updatable = false)
-	public Integer getPagePo() {
-		return pagePo;
+	@Column(name = "end_page", insertable = false, updatable = false)
+	public Short getEndPage() {
+		return endPage;
 	}
 
-	public void setPagePo(Integer pagePo) {
-		this.pagePo = pagePo;
+	public void setEndPage(Short endPage) {
+		this.endPage = endPage;
 	}
 
-	@Column(name = "PAGE", insertable = false, updatable = false)
-	public Integer getPage() {
-		return page;
+	@Column(name = "doc_pages", insertable = false, updatable = false)
+	public Short getDocPages() {
+		return docPages;
 	}
 
-	public void setPage(Integer page) {
-		this.page = page;
+	public void setDocPages(Short docPages) {
+		this.docPages = docPages;
 	}
 
-	@Column(name = "REMARK_DOCUMENT", insertable = false, updatable = false)
-	public String getRemarkDocument() {
-		return remarkDocument;
+	@Column(name = "doc_remark", insertable = false, updatable = false)
+	public String getDocRemark() {
+		return docRemark;
 	}
 
-	public void setRemarkDocument(String remarkDocument) {
-		this.remarkDocument = remarkDocument;
+	public void setDocRemark(String docRemark) {
+		this.docRemark = docRemark;
 	}
 
-	@Column(name = "GRAPH", insertable = false, updatable = false)
-	public String getGraph() {
-		return graph;
+	@Column(name = "prik_graph", insertable = false, updatable = false)
+	public String getPrikGraph() {
+		return prikGraph;
 	}
 
-	public void setGraph(String graph) {
-		this.graph = graph;
+	public void setPrikGraph(String prikGraph) {
+		this.prikGraph = prikGraph;
+	}
+
+	@Column(name = "dop_graph", insertable = false, updatable = false)
+	public String getDopGraph() {
+		return dopGraph;
+	}
+
+	public void setDopGraph(String dopGraph) {
+		this.dopGraph = dopGraph;
 	}
 
 	@Override

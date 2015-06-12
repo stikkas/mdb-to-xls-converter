@@ -17,7 +17,7 @@ import javax.persistence.TemporalType;
  * @author Благодатских С.
  */
 @Entity
-@Table(name = "DELO")
+@Table(name = "Case")
 public class Delo implements Serializable {
 
 	private static final long serialVersionUID = 1L;
@@ -26,58 +26,58 @@ public class Delo implements Serializable {
 	@Column(name = "ID")
 	private Integer id;
 
-	@Column(name = "CASE_BARCOD", insertable = false, updatable = false)
-	private Integer caseBarcod;
+	@Column(name = "barcode_number", insertable = false, updatable = false)
+	private Integer barcodeNumber;
 
-	@Column(name = "CASE_OPIS", insertable = false, updatable = false)
-	private Integer caseOpis;
+	@Column(name = "ra_opis_number", insertable = false, updatable = false)
+	private Integer raOpisNumber;
 
-	@Column(name = "CASE_DELO", insertable = false, updatable = false)
-	private Integer caseDelo;
+	@Column(name = "ra_case_number", insertable = false, updatable = false)
+	private Integer raCaseNumber;
 
-	@Column(name = "CASE_NUMBER", insertable = false, updatable = false)
+	@Column(name = "case_number", insertable = false, updatable = false)
 	private String caseNumber;
 
-	@Column(name = "DATE_START", insertable = false, updatable = false)
+	@Column(name = "start_date", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
-	private Calendar dateStart;
+	private Calendar startDate;
 
-	@Column(name = "DATE_END", insertable = false, updatable = false)
+	@Column(name = "end_date", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
-	private Calendar dateEnd;
+	private Calendar endDate;
 
-	@Column(name = "ARTICLE_STORAGE_DELO", insertable = false, updatable = false)
-	private String articleStorageDelo;
+	@Column(name = "store_article", insertable = false, updatable = false)
+	private String storeArticle;
 
-	@Column(name = "STORE_LIFE", insertable = false, updatable = false)
+	@Column(name = "store_life", insertable = false, updatable = false)
 	private String storeLife;
 
-	@Column(name = "DELO_TITLE", insertable = false, updatable = false)
-	private String deloTitle;
+	@Column(name = "case_title", insertable = false, updatable = false)
+	private String caseTitle;
 
-	@Column(name = "PAGE_DELO", insertable = false, updatable = false)
-	private String pageDelo;
+	@Column(name = "case_pages", insertable = false, updatable = false)
+	private Short casePages;
 
-	@Column(name = "NUMBER_TOM", insertable = false, updatable = false)
-	private Integer numberTom;
+	@Column(name = "tom_number", insertable = false, updatable = false)
+	private Short tomNumber;
 
-	@Column(name = "NUMBER_PART", insertable = false, updatable = false)
+	@Column(name = "part_number", insertable = false, updatable = false)
 	private Integer numberPart;
 
-	@Column(name = "SOURCE", insertable = false, updatable = false)
+	@Column(name = "source", insertable = false, updatable = false)
 	private String source;
 
-	@Column(name = "SOURCE_PRED", insertable = false, updatable = false)
-	private String sourcePred;
+	@Column(name = "department", insertable = false, updatable = false)
+	private String department;
 
-	@Column(name = "ESPECIALLY", insertable = false, updatable = false)
-	private String especially;
+	@Column(name = "specificity", insertable = false, updatable = false)
+	private String specificity;
 
-	@Column(name = "REMARK_DELO", insertable = false, updatable = false)
-	private String remarkDelo;
+	@Column(name = "case_remark", insertable = false, updatable = false)
+	private String caseRemark;
 
-	@Column(name = "GRAPH_DELO", insertable = false, updatable = false)
-	private String graphDelo;
+	@Column(name = "case_graph", insertable = false, updatable = false)
+	private String caseGraph;
 
 	@OneToMany(mappedBy = "delo", fetch = FetchType.EAGER)
 	private List<Document> documents;
@@ -93,28 +93,28 @@ public class Delo implements Serializable {
 		this.id = id;
 	}
 
-	public Integer getCaseBarcod() {
-		return caseBarcod;
+	public Integer getBarcodeNumber() {
+		return barcodeNumber;
 	}
 
-	public void setCaseBarcod(Integer caseBarcod) {
-		this.caseBarcod = caseBarcod;
+	public void setBarcodeNumber(Integer barcodeNumber) {
+		this.barcodeNumber = barcodeNumber;
 	}
 
-	public Integer getCaseOpis() {
-		return caseOpis;
+	public Integer getRaOpisNumber() {
+		return raOpisNumber;
 	}
 
-	public void setCaseOpis(Integer caseOpis) {
-		this.caseOpis = caseOpis;
+	public void setRaOpisNumber(Integer raOpisNumber) {
+		this.raOpisNumber = raOpisNumber;
 	}
 
-	public Integer getCaseDelo() {
-		return caseDelo;
+	public Integer getRaCaseNumber() {
+		return raCaseNumber;
 	}
 
-	public void setCaseDelo(Integer caseDelo) {
-		this.caseDelo = caseDelo;
+	public void setRaCaseNumber(Integer raCaseNumber) {
+		this.raCaseNumber = raCaseNumber;
 	}
 
 	public String getCaseNumber() {
@@ -125,28 +125,28 @@ public class Delo implements Serializable {
 		this.caseNumber = caseNumber;
 	}
 
-	public Calendar getDateStart() {
-		return dateStart;
+	public Calendar getStartDate() {
+		return startDate;
 	}
 
-	public void setDateStart(Calendar dateStart) {
-		this.dateStart = dateStart;
+	public void setStartDate(Calendar startDate) {
+		this.startDate = startDate;
 	}
 
-	public Calendar getDateEnd() {
-		return dateEnd;
+	public Calendar getEndDate() {
+		return endDate;
 	}
 
-	public void setDateEnd(Calendar dateEnd) {
-		this.dateEnd = dateEnd;
+	public void setEndDate(Calendar endDate) {
+		this.endDate = endDate;
 	}
 
-	public String getArticleStorageDelo() {
-		return articleStorageDelo;
+	public String getStoreArticle() {
+		return storeArticle;
 	}
 
-	public void setArticleStorageDelo(String articleStorageDelo) {
-		this.articleStorageDelo = articleStorageDelo;
+	public void setStoreArticle(String storeArticle) {
+		this.storeArticle = storeArticle;
 	}
 
 	public String getStoreLife() {
@@ -157,28 +157,28 @@ public class Delo implements Serializable {
 		this.storeLife = storeLife;
 	}
 
-	public String getDeloTitle() {
-		return deloTitle;
+	public String getCaseTitle() {
+		return caseTitle;
 	}
 
-	public void setDeloTitle(String deloTitle) {
-		this.deloTitle = deloTitle;
+	public void setCaseTitle(String caseTitle) {
+		this.caseTitle = caseTitle;
 	}
 
-	public String getPageDelo() {
-		return pageDelo;
+	public Short getCasePages() {
+		return casePages;
 	}
 
-	public void setPageDelo(String pageDelo) {
-		this.pageDelo = pageDelo;
+	public void setCasePages(Short casePages) {
+		this.casePages = casePages;
 	}
 
-	public Integer getNumberTom() {
-		return numberTom;
+	public Short getTomNumber() {
+		return tomNumber;
 	}
 
-	public void setNumberTom(Integer numberTom) {
-		this.numberTom = numberTom;
+	public void setTomNumber(Short tomNumber) {
+		this.tomNumber = tomNumber;
 	}
 
 	public Integer getNumberPart() {
@@ -197,36 +197,36 @@ public class Delo implements Serializable {
 		this.source = source;
 	}
 
-	public String getSourcePred() {
-		return sourcePred;
+	public String getDepartment() {
+		return department;
 	}
 
-	public void setSourcePred(String sourcePred) {
-		this.sourcePred = sourcePred;
+	public void setDepartment(String department) {
+		this.department = department;
 	}
 
-	public String getEspecially() {
-		return especially;
+	public String getSpecificity() {
+		return specificity;
 	}
 
-	public void setEspecially(String especially) {
-		this.especially = especially;
+	public void setSpecificity(String specificity) {
+		this.specificity = specificity;
 	}
 
-	public String getRemarkDelo() {
-		return remarkDelo;
+	public String getCaseRemark() {
+		return caseRemark;
 	}
 
-	public void setRemarkDelo(String remarkDelo) {
-		this.remarkDelo = remarkDelo;
+	public void setCaseRemark(String caseRemark) {
+		this.caseRemark = caseRemark;
 	}
 
-	public String getGraphDelo() {
-		return graphDelo;
+	public String getCaseGraph() {
+		return caseGraph;
 	}
 
-	public void setGraphDelo(String graphDelo) {
-		this.graphDelo = graphDelo;
+	public void setCaseGraph(String caseGraph) {
+		this.caseGraph = caseGraph;
 	}
 
 	public List<Document> getDocuments() {
@@ -236,5 +236,5 @@ public class Delo implements Serializable {
 	public void setDocuments(List<Document> documents) {
 		this.documents = documents;
 	}
-
+	
 }

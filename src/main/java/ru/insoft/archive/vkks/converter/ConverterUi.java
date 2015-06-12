@@ -20,6 +20,7 @@ import ru.insoft.archive.vkks.converter.control.ConverterController;
  */
 public class ConverterUi extends Application {
 
+	private final static String TITLE = "Конвертор ПРИКАЗОВ ПО ЛИЧНОМУ СОСТАВУ";
 	private Stage stage;
 
 	@Override
@@ -31,18 +32,16 @@ public class ConverterUi extends Application {
 		ConverterController controller = (ConverterController) loader.getController();
 		controller.setApp(this);
 
-		stage.setTitle("Конвертер данных из MDB в XLS (doc_title empty ? doc_type : doc_title; Page_s -> Страница №)");
+		stage.setTitle(TITLE);
 		stage.setScene(new Scene(root));
 		stage.show();
 		stage.setMinHeight(stage.getHeight());
 		stage.setMinWidth(stage.getWidth());
 
-		stage.setOnCloseRequest(new EventHandler<WindowEvent>() {
-			public void handle(WindowEvent we) {
-				try {
-					controller.savePrefs();
-				} catch (Exception e) {
-				}
+		stage.setOnCloseRequest(we -> {
+			try {
+				controller.savePrefs();
+			} catch (Exception e) {
 			}
 		});
 	}
