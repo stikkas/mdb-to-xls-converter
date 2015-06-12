@@ -12,14 +12,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.control.TextArea;
 import javax.persistence.EntityManager;
 import javax.persistence.Persistence;
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
@@ -32,6 +32,8 @@ import org.apache.poi.ss.usermodel.Workbook;
 import static ru.insoft.archive.vkks.converter.Config.dbPrefix;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
+import ru.insoft.archive.vkks.converter.error.ErrorCreateXlsFile;
+import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
 
 /**
  * Обрабатывает xls файлы, сопоставляя их с данными в базе. Также копирует pdf
@@ -55,7 +57,8 @@ public class Worker extends Thread {
 	 */
 	private final BooleanProperty done = new SimpleBooleanProperty(false);
 
-	private final boolean opis;
+	private final WorkMode mode;
+	private final Integer caseId;
 	private final String xlsDir;
 	private final EntityManager em;
 	private final Path xlsDirPath;
@@ -63,17 +66,24 @@ public class Worker extends Thread {
 	private final String accessDbDir;
 	private final Stat stat = new Stat();
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
+	private static final javax.validation.Validator validator
+			= Validation.buildDefaultValidatorFactory().getValidator();
 
-	public Worker(String xlsDir, String accessDb, TextArea logPanel, boolean opis) {
+	public Worker(String xlsDir, String accessDb, TextArea logPanel, WorkMode mode) {
+		this(xlsDir, accessDb, logPanel, mode, null);
+	}
+
+	public Worker(String xlsDir, String accessDb, TextArea logPanel, WorkMode mode, Integer caseId) {
 		this.xlsDir = xlsDir;
+		this.logPanel = logPanel;
+		this.mode = mode;
+		this.caseId = caseId;
 
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
 		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
-		this.logPanel = logPanel;
 		accessDbDir = Paths.get(accessDb).getParent().toString();
 		xlsDirPath = Paths.get(xlsDir);
-		this.opis = opis;
 	}
 
 	/**
@@ -86,37 +96,16 @@ public class Worker extends Thread {
 	@Override
 	public void run() {
 		try {
-			sleep(10000);
-		/*	
-			if (opis) {
-				createOpis();
-			} else {
-				((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
-					if (!commit) {
-						++stat.cases;
-						String caseNumber = null;
-						try {
-							if (checkCaseNumber(d)) {
-								caseNumber = d.getCaseNumber();
-
-								String fileName = getDirNameForDocuments(d);
-								Path fileXls = Paths.get(xlsDir, fileName + ".xls");
-								Path pdfDir = Paths.get(xlsDir, fileName);
-								Files.createDirectories(pdfDir);
-								createDelo(d, fileXls, pdfDir);
-
-								updateInfo("Создано дело с номером " + caseNumber);
-								++stat.casesCreated;
-							}
-						} catch (IOException ex) {
-							updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
-						}
-					}
-				});
+			switch (mode) {
+				case BY_ID:
+					createForId();
+					break;
+				case CASE_XLS:
+					createForAll();
+					break;
+				default: // GROUP_CASE_XLS
+					createForAllGroups();
 			}
-			*/
-		} catch (InterruptedException ex) {
-			Logger.getLogger(Worker.class.getName()).log(Level.SEVERE, null, ex);
 		} finally {
 			updateInfo(stat.toString());
 			done.set(true);
@@ -124,10 +113,78 @@ public class Worker extends Thread {
 	}
 
 	/**
+	 * Выбирает из базы дело с заданным ID и формирует для него xls и копирует
+	 * соответсвующие pdf
+	 */
+	private void createForId() {
+		Delo delo = em.find(Delo.class, caseId);
+		if (delo == null) {
+			updateInfo("Дело не найдено");
+			return;
+		}
+		++stat.cases;
+		convertOneDelo(delo);
+	}
+
+	/**
+	 * Формирует для каждой записи в таблице Case отдельный xls и копирует
+	 * соответсвующие pdf
+	 */
+	private void createForAll() {
+		((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
+			if (!commit) {
+				++stat.cases;
+				convertOneDelo(d);
+			}
+		});
+	}
+
+	/**
+	 * Формирует для каждой группы томов одного дела за один год отдельный xls и
+	 * копирует соответствующие pdf
+	 */
+	private void createForAllGroups() {
+
+	}
+
+	/**
+	 * Конвертирует данные из mdb для одной записи в таблице Case в файловое
+	 * дерево
+	 *
+	 * @param d запись из mdb
+	 */
+	private void convertOneDelo(Delo d) {
+		String caseNumber = null;
+		try {
+			if (checkDelo(d)) {
+				caseNumber = d.getCaseNumber();
+
+				String fileName = getDirNameForDocuments(d);
+				Path fileXls = Paths.get(xlsDir, fileName + ".xls");
+				Path pdfDir = Paths.get(xlsDir, fileName);
+				Files.createDirectories(pdfDir);
+				createDelo(d, fileXls, pdfDir);
+
+				updateInfo("Создано дело с номером " + caseNumber);
+				++stat.casesCreated;
+			}
+		} catch (WrongPdfFile | ErrorCreateXlsFile wex) {
+			updateInfo(wex.getMessage());
+		} catch (IOException ex) {
+			updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
+		}
+	}
+
+	/**
 	 * Создает файл с описью
 	 */
-	private void createOpis() {
+	private void createOpis() throws WrongPdfFile {
 		Workbook wb = new HSSFWorkbook();
+
+		CellStyle dateStyle = wb.createCellStyle();
+		DataFormat df = wb.createDataFormat();
+		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
+
 		Sheet sheet = wb.createSheet("Дело");
 		setHeaders(Config.deloHeaders, wb, sheet);
 		List<Delo> delas = em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList();
@@ -139,14 +196,15 @@ public class Worker extends Thread {
 			}
 			++stat.cases;
 			Delo d = delas.get(i);
-			if (checkCaseNumber(d)) {
+			if (checkDelo(d)) {
 				String caseNumber = d.getCaseNumber();
 				String fileName = getDirNameForDocuments(d);
 				Path pdfDir = Paths.get(xlsDir, fileName);
 				try {
 					Files.createDirectories(pdfDir);
 					fillDeloSheet(wb, sheet, d, row);
-					fillDocsSheet(wb, wb.createSheet("Документы" + row), d.getDocuments(), pdfDir);
+
+					fillDocsSheet(wb, wb.createSheet("Документы" + row), d.getDocuments(), pdfDir, dateStyle);
 					++row;
 					updateInfo("Создано дело с номером " + caseNumber);
 					++stat.casesCreated;
@@ -161,26 +219,6 @@ public class Worker extends Thread {
 			updateInfo("Не могу создать файл opis.xls: " + ex.getMessage());
 		}
 
-	}
-
-	/**
-	 * Проверяет правильность дела
-	 *
-	 * @param d дело
-	 * @return в случае отсутствия номера или одной из дат, дело считается
-	 * неправильным и пропускается
-	 */
-	private boolean checkCaseNumber(Delo d) {
-		String caseNumber = d.getCaseNumber();
-		if (caseNumber == null || caseNumber.trim().isEmpty()) {
-			return false;
-		}
-		if (d.getStartDate() == null || d.getEndDate() == null) {
-			++stat.casesSkip;
-			return false;
-		}
-
-		return true;
 	}
 
 	/**
@@ -209,14 +247,32 @@ public class Worker extends Thread {
 	 * @param file путь к xls файлу
 	 * @param pdfDir директория для pdf файлов дела
 	 */
-	private void createDelo(Delo d, Path file, Path pdfDir) {
+	private void createDelo(Delo d, Path file, Path pdfDir) throws WrongPdfFile, ErrorCreateXlsFile {
 
 		Workbook wb = new HSSFWorkbook();
 		Sheet sheet = wb.createSheet("Дело");
 		setHeaders(Config.deloHeaders, wb, sheet);
 		fillDeloSheet(wb, sheet, d, 1);
 
-		fillDocsSheet(wb, wb.createSheet("Документы"), d.getDocuments(), pdfDir);
+		CellStyle dateStyle = wb.createCellStyle();
+		DataFormat df = wb.createDataFormat();
+		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
+
+		sheet = wb.createSheet("Документы");
+		int nextRow = fillDocsSheet(wb, sheet, d.getDocuments(), pdfDir, dateStyle);
+
+		if (d.getCaseGraph() != null) {
+			/*
+			 setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
+			 setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
+			 row.createCell(4).setCellValue(doc.getDocTitle());
+			 createGraphDoc(doc.getPrikGraph(), pdfDir, pagesCell, linkCell);
+			 row.createCell(13).setCellValue(doc.getStartPage());
+			 */
+			//TODO: пункт 3.5 поставленной задачи ни в какие ворота не лезет. 
+			createDocRecord(sheet.createRow(nextRow), new Document(), dateStyle, pdfDir);
+			++stat.docs;
+		}
 
 		writeData(wb, file);
 	}
@@ -224,11 +280,11 @@ public class Worker extends Thread {
 	/**
 	 * Записывает данные в файл xls
 	 */
-	private void writeData(Workbook wb, Path file) {
+	private void writeData(Workbook wb, Path file) throws ErrorCreateXlsFile {
 		try (OutputStream ous = Files.newOutputStream(file)) {
 			wb.write(ous);
 		} catch (IOException ex) {
-			updateInfo("Не могу создать файл " + file + ": " + ex.getMessage());
+			throw new ErrorCreateXlsFile("Не могу создать файл " + file + ": " + ex.getMessage());
 		}
 	}
 
@@ -249,24 +305,18 @@ public class Worker extends Thread {
 	/**
 	 * Заполняет страницу документов
 	 */
-	private void fillDocsSheet(Workbook wb, Sheet sheet, List<Document> documents, Path pdfDir) {
+	private int fillDocsSheet(Workbook wb, Sheet sheet, List<Document> documents,
+			Path pdfDir, CellStyle dateStyle) throws WrongPdfFile {
 		setHeaders(Config.docHeaders, wb, sheet);
-
-		CellStyle dateStyle = wb.createCellStyle();
-		DataFormat df = wb.createDataFormat();
-		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
 
 		int size = documents.size();
 		int rowNumber = 1;
 		for (int i = 0; i < size; ++i) {
 			Document doc = documents.get(i);
-			if (doc.getStartPage() == null) {
-				++stat.docsSkip;
-				continue;
-			}
 			createDocRecord(sheet.createRow(rowNumber++), doc, dateStyle, pdfDir);
 			++stat.docs;
 		}
+		return rowNumber;
 	}
 
 	/**
@@ -305,7 +355,7 @@ public class Worker extends Thread {
 	 * @param row
 	 * @param doc
 	 */
-	private void createDocRecord(Row row, Document doc, CellStyle style, Path pdfDir) {
+	private void createDocRecord(Row row, Document doc, CellStyle style, Path pdfDir) throws WrongPdfFile {
 		setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
 		setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
 		row.createCell(2);
@@ -313,38 +363,65 @@ public class Worker extends Thread {
 		row.createCell(4).setCellValue(doc.getDocTitle());
 		row.createCell(5);
 		row.createCell(6);
-		setCellValue(row.createCell(8), doc.getDocRemark(), ValueType.STRING);
-		String graph = doc.getPrikGraph();
-		if (graph != null) {
-			Path srcFile = getPathForLink(graph);
-			int pages = getPagesOfPdf(srcFile.toString());
-			if (pages != 0) {
 
-				Path dstFile = pdfDir.resolve(srcFile.getFileName());
-				if (!Files.exists(dstFile)) {
-					try {
-						Files.copy(srcFile, dstFile);
-					} catch (IOException ex) {
-						updateInfo("Ошибка копирования файла " + srcFile + " в "
-								+ pdfDir + ": " + ex.getMessage());
-					}
-				} else {
-					updateInfo("Файл " + dstFile + " уже существует");
-				}
-				int startIndex = xlsDirPath.getNameCount();
-				int endIndex = dstFile.getNameCount();
-				String relativeDstFileName = FilenameUtils.separatorsToWindows(
-						dstFile.subpath(startIndex, endIndex).toString());
-				setCellValue(row.createCell(9), relativeDstFileName, ValueType.STRING);
-				row.createCell(7).setCellValue(pages);
-			}
-		} else {
-			row.createCell(9);
+		Cell pagesCell = row.createCell(7);
+		pagesCell.setCellType(Cell.CELL_TYPE_NUMERIC);
+		setCellValue(row.createCell(8), doc.getDocRemark(), ValueType.STRING);
+		Cell linkCell = row.createCell(9);
+		linkCell.setCellType(Cell.CELL_TYPE_STRING);
+
+		createGraphDoc(doc.getPrikGraph(), pdfDir, pagesCell, linkCell);
+
+		String dopGraph = doc.getDopGraph();
+		if (dopGraph != null) {
+			createGraphDoc(dopGraph, pdfDir, pagesCell, linkCell);
 		}
 		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
 		row.createCell(11);
 		row.createCell(12);
 		row.createCell(13).setCellValue(doc.getStartPage());
+	}
+
+	/**
+	 * Копирует pdf файлы документа в нужное место и записывает данные о
+	 * документе в лист "Документы". в ячейке страниц прописывается суммарное
+	 * значение всех графических образов этого документа.
+	 *
+	 * @param graphLink ссылка на pdf
+	 * @param pdfDir директория, относительно которой записываются pdf файлы
+	 * @param pagesCell ячейка для записи кол-ва страниц
+	 * @param linkCell ячейка для записи путей к файлам, разделенных точкой с
+	 * запятой
+	 */
+	private void createGraphDoc(String graphLink, Path pdfDir, Cell pagesCell, Cell linkCell) throws WrongPdfFile {
+		Path srcFile = getPathForLink(graphLink);
+		int pages = getPagesOfPdf(srcFile.toString());
+
+		Path dstFile = pdfDir.resolve(srcFile.getFileName());
+		if (!Files.exists(dstFile)) {
+			try {
+				Files.copy(srcFile, dstFile);
+			} catch (IOException ex) {
+				updateInfo("Ошибка копирования файла " + srcFile + " в "
+						+ pdfDir + ": " + ex.getMessage());
+			}
+		} else {
+			updateInfo("Файл " + dstFile + " уже существует");
+		}
+
+		int startIndex = xlsDirPath.getNameCount();
+		int endIndex = dstFile.getNameCount();
+		String relativeDstFileName = FilenameUtils.separatorsToWindows(
+				dstFile.subpath(startIndex, endIndex).toString());
+
+		String paths = linkCell.getStringCellValue();
+		if (paths != null && !paths.trim().isEmpty()) {
+			paths += ";" + relativeDstFileName;
+		} else {
+			paths = relativeDstFileName;
+		}
+		linkCell.setCellValue(paths);
+		pagesCell.setCellValue((int) pagesCell.getNumericCellValue() + pages);
 	}
 
 	/**
@@ -394,12 +471,11 @@ public class Worker extends Thread {
 	 * @param filename имя файла
 	 * @return количество страниц
 	 */
-	private int getPagesOfPdf(String filename) {
+	private int getPagesOfPdf(String filename) throws WrongPdfFile {
 		try {
 			return new PdfReader(filename).getNumberOfPages();
 		} catch (IOException ex) {
-			updateInfo("Невозможно получить кол-во страниц " + filename + ": " + ex.getMessage());
-			return 0;
+			throw new WrongPdfFile("Невозможно получить кол-во страниц " + filename + ": " + ex.getMessage());
 		}
 	}
 
@@ -415,6 +491,45 @@ public class Worker extends Thread {
 	public BooleanProperty doneProperty() {
 		return done;
 	}
+
+	/**
+	 * Проверяет правильность оформления дела и его документов
+	 *
+	 * @param delo интересуемое дело
+	 * @return в случае правильного оформления - true, иначе - false
+	 */
+	private boolean checkDelo(Delo delo) {
+		Set<ConstraintViolation<Delo>> errors = validator.validate(delo);
+		boolean valid = !errors.isEmpty();
+		StringBuilder builder = null;
+		if (!valid) {
+			builder = new StringBuilder(String
+					.format("Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
+			for (ConstraintViolation<Delo> error : errors) {
+				builder.append("\t").append(error.getMessage());
+			}
+		}
+
+		for (Document doc : delo.getDocuments()) {
+			Set<ConstraintViolation<Document>> docErrors = validator.validate(doc);
+			if (!docErrors.isEmpty()) {
+				valid = false;
+				if (builder == null) {
+					builder = new StringBuilder(String
+							.format("Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
+				}
+				builder.append("\t").append("документ с ID = ").append(doc.getId())
+						.append(" имеет следующие ошибки:\n");
+				for (ConstraintViolation<Document> error : docErrors) {
+					builder.append("\t\t").append(error.getMessage());
+				}
+			}
+		}
+		if (builder != null) {
+			updateInfo(builder.toString());
+		}
+		return valid;
+	}
 }
 
 class Stat {
@@ -428,14 +543,6 @@ class Stat {
 	 */
 	long docs;
 	/**
-	 * Кол-во пропущеных документов
-	 */
-	long docsSkip;
-	/**
-	 * Кол-во пропущеных дел
-	 */
-	long casesSkip;
-	/**
 	 * Кол-во созданных файлов дел
 	 */
 	long casesCreated;
@@ -443,8 +550,8 @@ class Stat {
 	@Override
 	public String toString() {
 		return String.format("Обработано дел - %d\n"
-				+ "Создано дел - %d\nПропущено дел - %d\nЗаписано документов - %d\n"
-				+ "Пропущено документов - %d\n", cases, casesCreated, casesSkip, docs, docsSkip);
+				+ "Создано дел - %d\nПропущено дел - %d\nЗаписано документов - %d\n",
+				cases, casesCreated, cases - casesCreated, docs);
 	}
 
 }

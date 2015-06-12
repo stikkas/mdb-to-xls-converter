@@ -1,11 +1,14 @@
 package ru.insoft.archive.vkks.converter.control;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -24,6 +27,7 @@ import javafx.stage.FileChooser;
 import javafx.util.Pair;
 import ru.insoft.archive.vkks.converter.Config;
 import ru.insoft.archive.vkks.converter.ConverterUi;
+import ru.insoft.archive.vkks.converter.WorkMode;
 import ru.insoft.archive.vkks.converter.Worker;
 
 /**
@@ -34,16 +38,17 @@ public class ConverterController {
 
 	private ConverterUi app;
 	private FileChooser fileChooser;
+	private FileChooser saveLogChooser;
 	private DirectoryChooser dirChooser;
 	private Preferences prefs;
 	/**
-	* Количество запущенных процессов конвертации
-	*/
+	 * Количество запущенных процессов конвертации
+	 */
 	private final ObjectProperty<AtomicInteger> countWorkers = new SimpleObjectProperty<>(new AtomicInteger(0));
 
 	/**
-	 * Запущенные процессы конвертации, нужны для операции прерывания и для отслеживания 
-	 * попытки запустить один и тотже процесс дважды.
+	 * Запущенные процессы конвертации, нужны для операции прерывания и для
+	 * отслеживания попытки запустить один и тотже процесс дважды.
 	 */
 	private static final Map<Pair<String, String>, Worker> runningWorkers = new HashMap<>();
 
@@ -96,7 +101,16 @@ public class ConverterController {
 		} else {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
 					+ "]. Результат будет помещен в [" + dir + "].\n");
-			Worker w = new Worker(dir, dbFileEdit.getText(), logPanel, false);
+			Worker w;
+
+			if (caseId.isDisabled()) {
+				w = new Worker(dir, dbFileEdit.getText(), logPanel,
+						formatDst.getSelectedToggle() == everyRadio
+								? WorkMode.CASE_XLS : WorkMode.GROUP_CASE_XLS);
+			} else {
+				w = new Worker(dir, dbFileEdit.getText(), logPanel, WorkMode.BY_ID, caseId.getValue());
+			}
+
 			runningWorkers.put(p, w);
 			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
 			w.doneProperty().addListener(e -> {
@@ -109,7 +123,20 @@ public class ConverterController {
 
 	@FXML
 	private void onSaveLog() {
-
+		if (saveLogChooser == null) {
+			saveLogChooser = new FileChooser();
+			saveLogChooser.setTitle("Выбор файла для сохранения отчета");
+		}
+		File file = saveLogChooser.showSaveDialog(app.getStage());
+		if (file != null) {
+			try {
+				Files.write(file.toPath(), logPanel.getText().getBytes());
+			} catch (IOException ex) {
+				logPanel.insertText(0, "Произошла ошибка записи в файл: " + ex.getMessage()
+						+ "\nПопробуйте еще раз, либо выделите весь текст мышкой, скопируйте и вставьте в файл"
+				);
+			}
+		}
 	}
 
 	/**

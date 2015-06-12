@@ -11,6 +11,7 @@ import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import javax.validation.constraints.NotNull;
 
 /**
  *
@@ -22,69 +23,49 @@ public class Delo implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	@Id
-	@Column(name = "ID")
 	private Integer id;
 
-	@Column(name = "barcode_number", insertable = false, updatable = false)
 	private Integer barcodeNumber;
 
-	@Column(name = "ra_opis_number", insertable = false, updatable = false)
 	private Integer raOpisNumber;
 
-	@Column(name = "ra_case_number", insertable = false, updatable = false)
 	private Integer raCaseNumber;
 
-	@Column(name = "case_number", insertable = false, updatable = false)
 	private String caseNumber;
 
-	@Column(name = "start_date", insertable = false, updatable = false)
-	@Temporal(TemporalType.TIMESTAMP)
 	private Calendar startDate;
 
-	@Column(name = "end_date", insertable = false, updatable = false)
-	@Temporal(TemporalType.TIMESTAMP)
 	private Calendar endDate;
 
-	@Column(name = "store_article", insertable = false, updatable = false)
 	private String storeArticle;
 
-	@Column(name = "store_life", insertable = false, updatable = false)
 	private String storeLife;
 
-	@Column(name = "case_title", insertable = false, updatable = false)
 	private String caseTitle;
 
-	@Column(name = "case_pages", insertable = false, updatable = false)
 	private Short casePages;
 
-	@Column(name = "tom_number", insertable = false, updatable = false)
 	private Short tomNumber;
 
-	@Column(name = "part_number", insertable = false, updatable = false)
 	private Integer numberPart;
 
-	@Column(name = "source", insertable = false, updatable = false)
 	private String source;
 
-	@Column(name = "department", insertable = false, updatable = false)
 	private String department;
 
-	@Column(name = "specificity", insertable = false, updatable = false)
 	private String specificity;
 
-	@Column(name = "case_remark", insertable = false, updatable = false)
 	private String caseRemark;
 
-	@Column(name = "case_graph", insertable = false, updatable = false)
 	private String caseGraph;
 
-	@OneToMany(mappedBy = "delo", fetch = FetchType.EAGER)
 	private List<Document> documents;
 
 	public Delo() {
 	}
 
+	@Id
+	@Column(name = "ID")
 	public Integer getId() {
 		return id;
 	}
@@ -93,6 +74,7 @@ public class Delo implements Serializable {
 		this.id = id;
 	}
 
+	@Column(name = "barcode_number", insertable = false, updatable = false)
 	public Integer getBarcodeNumber() {
 		return barcodeNumber;
 	}
@@ -101,6 +83,7 @@ public class Delo implements Serializable {
 		this.barcodeNumber = barcodeNumber;
 	}
 
+	@Column(name = "ra_opis_number", insertable = false, updatable = false)
 	public Integer getRaOpisNumber() {
 		return raOpisNumber;
 	}
@@ -109,6 +92,7 @@ public class Delo implements Serializable {
 		this.raOpisNumber = raOpisNumber;
 	}
 
+	@Column(name = "ra_case_number", insertable = false, updatable = false)
 	public Integer getRaCaseNumber() {
 		return raCaseNumber;
 	}
@@ -117,6 +101,8 @@ public class Delo implements Serializable {
 		this.raCaseNumber = raCaseNumber;
 	}
 
+	@NotNull(message = "номер дела отсутствует")
+	@Column(name = "case_number", insertable = false, updatable = false)
 	public String getCaseNumber() {
 		return caseNumber;
 	}
@@ -125,6 +111,9 @@ public class Delo implements Serializable {
 		this.caseNumber = caseNumber;
 	}
 
+	@NotNull(message = "начальная дата дела отсутствует")
+	@Column(name = "start_date", insertable = false, updatable = false)
+	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getStartDate() {
 		return startDate;
 	}
@@ -133,6 +122,9 @@ public class Delo implements Serializable {
 		this.startDate = startDate;
 	}
 
+	@NotNull(message = "конечная дата дела отсутствует")
+	@Column(name = "end_date", insertable = false, updatable = false)
+	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getEndDate() {
 		return endDate;
 	}
@@ -141,6 +133,7 @@ public class Delo implements Serializable {
 		this.endDate = endDate;
 	}
 
+	@Column(name = "store_article", insertable = false, updatable = false)
 	public String getStoreArticle() {
 		return storeArticle;
 	}
@@ -149,6 +142,7 @@ public class Delo implements Serializable {
 		this.storeArticle = storeArticle;
 	}
 
+	@Column(name = "store_life", insertable = false, updatable = false)
 	public String getStoreLife() {
 		return storeLife;
 	}
@@ -157,6 +151,8 @@ public class Delo implements Serializable {
 		this.storeLife = storeLife;
 	}
 
+	@NotNull(message = "название дела отсутствует")
+	@Column(name = "case_title", insertable = false, updatable = false)
 	public String getCaseTitle() {
 		return caseTitle;
 	}
@@ -165,6 +161,7 @@ public class Delo implements Serializable {
 		this.caseTitle = caseTitle;
 	}
 
+	@Column(name = "case_pages", insertable = false, updatable = false)
 	public Short getCasePages() {
 		return casePages;
 	}
@@ -173,6 +170,8 @@ public class Delo implements Serializable {
 		this.casePages = casePages;
 	}
 
+	@NotNull(message = "номер тома дела отсутствует")
+	@Column(name = "tom_number", insertable = false, updatable = false)
 	public Short getTomNumber() {
 		return tomNumber;
 	}
@@ -181,6 +180,7 @@ public class Delo implements Serializable {
 		this.tomNumber = tomNumber;
 	}
 
+	@Column(name = "part_number", insertable = false, updatable = false)
 	public Integer getNumberPart() {
 		return numberPart;
 	}
@@ -189,6 +189,7 @@ public class Delo implements Serializable {
 		this.numberPart = numberPart;
 	}
 
+	@Column(name = "source", insertable = false, updatable = false)
 	public String getSource() {
 		return source;
 	}
@@ -197,6 +198,7 @@ public class Delo implements Serializable {
 		this.source = source;
 	}
 
+	@Column(name = "department", insertable = false, updatable = false)
 	public String getDepartment() {
 		return department;
 	}
@@ -205,6 +207,7 @@ public class Delo implements Serializable {
 		this.department = department;
 	}
 
+	@Column(name = "specificity", insertable = false, updatable = false)
 	public String getSpecificity() {
 		return specificity;
 	}
@@ -213,6 +216,7 @@ public class Delo implements Serializable {
 		this.specificity = specificity;
 	}
 
+	@Column(name = "case_remark", insertable = false, updatable = false)
 	public String getCaseRemark() {
 		return caseRemark;
 	}
@@ -221,6 +225,7 @@ public class Delo implements Serializable {
 		this.caseRemark = caseRemark;
 	}
 
+	@Column(name = "case_graph", insertable = false, updatable = false)
 	public String getCaseGraph() {
 		return caseGraph;
 	}
@@ -229,6 +234,7 @@ public class Delo implements Serializable {
 		this.caseGraph = caseGraph;
 	}
 
+	@OneToMany(mappedBy = "delo", fetch = FetchType.EAGER)
 	public List<Document> getDocuments() {
 		return documents;
 	}
@@ -236,5 +242,5 @@ public class Delo implements Serializable {
 	public void setDocuments(List<Document> documents) {
 		this.documents = documents;
 	}
-	
+
 }

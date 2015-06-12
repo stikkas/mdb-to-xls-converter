@@ -2,7 +2,6 @@ package ru.insoft.archive.vkks.converter.domain;
 
 import java.io.Serializable;
 import java.util.Calendar;
-import java.util.GregorianCalendar;
 import java.util.Objects;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -13,6 +12,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import javax.validation.constraints.NotNull;
 
 /**
  *
@@ -71,11 +71,9 @@ public class Document implements Serializable {
 		this.delo = delo;
 	}
 
+	@NotNull(message = "номер документа отсутствует")
 	@Column(name = "doc_number", insertable = false, updatable = false)
 	public String getDocNumber() {
-		if (docNumber == null || docNumber.trim().isEmpty()) {
-			return "1000";
-		}
 		return docNumber;
 	}
 
@@ -83,15 +81,10 @@ public class Document implements Serializable {
 		this.docNumber = docNumber;
 	}
 
+	@NotNull(message = "дата документа отсутствует")
 	@Column(name = "doc_date", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getDocDate() {
-		if (docDate == null) {
-			Calendar cal = GregorianCalendar.getInstance();
-			cal.set(1111, 10, 11);
-			return cal;
-		}
-
 		return docDate;
 	}
 
@@ -108,11 +101,9 @@ public class Document implements Serializable {
 		this.docType = docType;
 	}
 
+	@NotNull(message = "название документа отсутствует")
 	@Column(name = "doc_title", insertable = false, updatable = false)
 	public String getDocTitle() {
-		if (docTitle == null || docTitle.trim().isEmpty()) {
-			return docType;
-		}
 		return docTitle;
 	}
 
@@ -120,6 +111,7 @@ public class Document implements Serializable {
 		this.docTitle = docTitle;
 	}
 
+	@NotNull(message = "начальная страница документа отсутствует")
 	@Column(name = "start_page", insertable = false, updatable = false)
 	public Short getStartPage() {
 		return startPage;
@@ -156,6 +148,7 @@ public class Document implements Serializable {
 		this.docRemark = docRemark;
 	}
 
+	@NotNull(message = "прикрепленный графический образ документа отсутствует")
 	@Column(name = "prik_graph", insertable = false, updatable = false)
 	public String getPrikGraph() {
 		return prikGraph;

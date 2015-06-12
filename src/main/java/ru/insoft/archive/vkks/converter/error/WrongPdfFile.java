@@ -4,9 +4,9 @@ package ru.insoft.archive.vkks.converter.error;
  *
  * @author Благодатских С.
  */
-public class WrongFormat extends Exception {
+public class WrongPdfFile extends Exception {
 
-	public WrongFormat(String message) {
+	public WrongPdfFile(String message) {
 		super(message);
 	}
 
