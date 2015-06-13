@@ -10,8 +10,10 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -141,9 +143,23 @@ public class Worker extends Thread {
 
 	/**
 	 * Формирует для каждой группы томов одного дела за один год отдельный xls и
-	 * копирует соответствующие pdf
+	 * копирует соответствующие pdf. Год берется из поля end_date.
 	 */
 	private void createForAllGroups() {
+		for (Entry<GroupDeloKey, List<Delo>> e : ((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class)
+				.getResultList()).stream()
+				.collect(Collectors.groupingBy(delo
+								-> new GroupDeloKey(delo.getEndDate().get(Calendar.YEAR), delo.getCaseNumber())))
+				.entrySet()) {
+
+			try {
+				if (!createOpis(e.getKey(), e.getValue())) {
+					break;
+				}
+			} catch (WrongPdfFile | IOException wex) {
+				updateInfo(wex.getMessage());
+			}
+		}
 
 	}
 
@@ -176,9 +192,9 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Создает файл с описью
+	 * Создает файл с описью для нескольких дел
 	 */
-	private void createOpis() throws WrongPdfFile {
+	private boolean createOpis(GroupDeloKey key, List<Delo> delos) throws WrongPdfFile, IOException {
 		Workbook wb = new HSSFWorkbook();
 
 		CellStyle dateStyle = wb.createCellStyle();
@@ -187,38 +203,51 @@ public class Worker extends Thread {
 
 		Sheet sheet = wb.createSheet("Дело");
 		setHeaders(Config.deloHeaders, wb, sheet);
-		List<Delo> delas = em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList();
-		int size = delas.size();
+		int size = delos.size();
 		int row = 1;
+		String xlsFileName = key.toString() + ".xls";
 		for (int i = 0; i < size; ++i) {
 			if (commit) {
-				break;
+				return false;
 			}
 			++stat.cases;
-			Delo d = delas.get(i);
+			Delo d = delos.get(i);
 			if (checkDelo(d)) {
 				String caseNumber = d.getCaseNumber();
-				String fileName = getDirNameForDocuments(d);
-				Path pdfDir = Paths.get(xlsDir, fileName);
+				Path pdfDir = Paths.get(xlsDir, getDirNameForDocuments(d));
 				try {
 					Files.createDirectories(pdfDir);
 					fillDeloSheet(wb, sheet, d, row);
 
-					fillDocsSheet(wb, wb.createSheet("Документы" + row), d.getDocuments(), pdfDir, dateStyle);
+					int nextRow = fillDocsSheet(wb, wb.createSheet("Документы" + row), d.getDocuments(), pdfDir, dateStyle);
+
+					if (d.getCaseGraph() != null) {
+						/*
+						 setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
+						 setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
+						 row.createCell(4).setCellValue(doc.getDocTitle());
+						 createGraphDoc(doc.getPrikGraph(), pdfDir, pagesCell, linkCell);
+						 row.createCell(13).setCellValue(doc.getStartPage());
+						 */
+						//TODO: пункт 3.5 поставленной задачи ни в какие ворота не лезет. 
+//						createDocRecord(sheet.createRow(nextRow), new Document(), dateStyle, pdfDir);
+//						++stat.docs;
+					}
+
 					++row;
 					updateInfo("Создано дело с номером " + caseNumber);
 					++stat.casesCreated;
 				} catch (IOException ex) {
-					updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
+					throw new IOException("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
 				}
 			}
 		}
-		try (OutputStream ous = Files.newOutputStream(Paths.get(xlsDir, "opis.xls"))) {
+		try (OutputStream ous = Files.newOutputStream(Paths.get(xlsDir, xlsFileName))) {
 			wb.write(ous);
 		} catch (IOException ex) {
-			updateInfo("Не могу создать файл opis.xls: " + ex.getMessage());
+			updateInfo(String.format("Не могу создать файл %s: %s", xlsFileName, ex.getMessage()));
 		}
-
+		return true;
 	}
 
 	/**
@@ -270,8 +299,8 @@ public class Worker extends Thread {
 			 row.createCell(13).setCellValue(doc.getStartPage());
 			 */
 			//TODO: пункт 3.5 поставленной задачи ни в какие ворота не лезет. 
-			createDocRecord(sheet.createRow(nextRow), new Document(), dateStyle, pdfDir);
-			++stat.docs;
+//			createDocRecord(sheet.createRow(nextRow), new Document(), dateStyle, pdfDir);
+//			++stat.docs;
 		}
 
 		writeData(wb, file);
@@ -374,7 +403,10 @@ public class Worker extends Thread {
 
 		String dopGraph = doc.getDopGraph();
 		if (dopGraph != null) {
-			createGraphDoc(dopGraph, pdfDir, pagesCell, linkCell);
+			dopGraph = dopGraph.trim();
+			if (!dopGraph.isEmpty()) {
+				createGraphDoc(dopGraph, pdfDir, pagesCell, linkCell);
+			}
 		}
 		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
 		row.createCell(11);
@@ -473,7 +505,10 @@ public class Worker extends Thread {
 	 */
 	private int getPagesOfPdf(String filename) throws WrongPdfFile {
 		try {
-			return new PdfReader(filename).getNumberOfPages();
+			PdfReader reader = new PdfReader(filename);
+			int pages = reader.getNumberOfPages();
+			reader.close();
+			return pages;
 		} catch (IOException ex) {
 			throw new WrongPdfFile("Невозможно получить кол-во страниц " + filename + ": " + ex.getMessage());
 		}
@@ -500,7 +535,7 @@ public class Worker extends Thread {
 	 */
 	private boolean checkDelo(Delo delo) {
 		Set<ConstraintViolation<Delo>> errors = validator.validate(delo);
-		boolean valid = !errors.isEmpty();
+		boolean valid = errors.isEmpty();
 		StringBuilder builder = null;
 		if (!valid) {
 			builder = new StringBuilder(String
@@ -530,28 +565,4 @@ public class Worker extends Thread {
 		}
 		return valid;
 	}
-}
-
-class Stat {
-
-	/**
-	 * Кол-во обработанных дел
-	 */
-	long cases;
-	/**
-	 * Кол-во созданных записей документов
-	 */
-	long docs;
-	/**
-	 * Кол-во созданных файлов дел
-	 */
-	long casesCreated;
-
-	@Override
-	public String toString() {
-		return String.format("Обработано дел - %d\n"
-				+ "Создано дел - %d\nПропущено дел - %d\nЗаписано документов - %d\n",
-				cases, casesCreated, cases - casesCreated, docs);
-	}
-
 }

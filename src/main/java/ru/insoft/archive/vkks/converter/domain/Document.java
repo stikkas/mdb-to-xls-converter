@@ -13,6 +13,7 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.validation.constraints.NotNull;
+import org.hibernate.validator.constraints.NotEmpty;
 
 /**
  *
@@ -36,11 +37,11 @@ public class Document implements Serializable {
 
 	private String docTitle;
 
-	private Short startPage;
+	private String startPage;
 
-	private Short endPage;
+	private String endPage;
 
-	private Short docPages;
+	private String docPages;
 
 	private String docRemark;
 
@@ -71,7 +72,7 @@ public class Document implements Serializable {
 		this.delo = delo;
 	}
 
-	@NotNull(message = "номер документа отсутствует")
+	@NotEmpty(message = "номер документа отсутствует")
 	@Column(name = "doc_number", insertable = false, updatable = false)
 	public String getDocNumber() {
 		return docNumber;
@@ -101,7 +102,7 @@ public class Document implements Serializable {
 		this.docType = docType;
 	}
 
-	@NotNull(message = "название документа отсутствует")
+	@NotEmpty(message = "название документа отсутствует")
 	@Column(name = "doc_title", insertable = false, updatable = false)
 	public String getDocTitle() {
 		return docTitle;
@@ -111,31 +112,31 @@ public class Document implements Serializable {
 		this.docTitle = docTitle;
 	}
 
-	@NotNull(message = "начальная страница документа отсутствует")
+	@NotEmpty(message = "начальная страница документа отсутствует")
 	@Column(name = "start_page", insertable = false, updatable = false)
-	public Short getStartPage() {
+	public String getStartPage() {
 		return startPage;
 	}
 
-	public void setStartPage(Short startPage) {
+	public void setStartPage(String startPage) {
 		this.startPage = startPage;
 	}
 
 	@Column(name = "end_page", insertable = false, updatable = false)
-	public Short getEndPage() {
+	public String getEndPage() {
 		return endPage;
 	}
 
-	public void setEndPage(Short endPage) {
+	public void setEndPage(String endPage) {
 		this.endPage = endPage;
 	}
 
 	@Column(name = "doc_pages", insertable = false, updatable = false)
-	public Short getDocPages() {
+	public String getDocPages() {
 		return docPages;
 	}
 
-	public void setDocPages(Short docPages) {
+	public void setDocPages(String docPages) {
 		this.docPages = docPages;
 	}
 
@@ -148,7 +149,7 @@ public class Document implements Serializable {
 		this.docRemark = docRemark;
 	}
 
-	@NotNull(message = "прикрепленный графический образ документа отсутствует")
+	@NotEmpty(message = "прикрепленный графический образ документа отсутствует")
 	@Column(name = "prik_graph", insertable = false, updatable = false)
 	public String getPrikGraph() {
 		return prikGraph;

@@ -12,6 +12,7 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.validation.constraints.NotNull;
+import org.hibernate.validator.constraints.NotEmpty;
 
 /**
  *
@@ -43,9 +44,9 @@ public class Delo implements Serializable {
 
 	private String caseTitle;
 
-	private Short casePages;
+	private Integer casePages;
 
-	private Short tomNumber;
+	private Integer tomNumber;
 
 	private Integer numberPart;
 
@@ -101,7 +102,7 @@ public class Delo implements Serializable {
 		this.raCaseNumber = raCaseNumber;
 	}
 
-	@NotNull(message = "номер дела отсутствует")
+	@NotEmpty(message = "номер дела отсутствует")
 	@Column(name = "case_number", insertable = false, updatable = false)
 	public String getCaseNumber() {
 		return caseNumber;
@@ -151,7 +152,7 @@ public class Delo implements Serializable {
 		this.storeLife = storeLife;
 	}
 
-	@NotNull(message = "название дела отсутствует")
+	@NotEmpty(message = "название дела отсутствует")
 	@Column(name = "case_title", insertable = false, updatable = false)
 	public String getCaseTitle() {
 		return caseTitle;
@@ -162,21 +163,21 @@ public class Delo implements Serializable {
 	}
 
 	@Column(name = "case_pages", insertable = false, updatable = false)
-	public Short getCasePages() {
+	public Integer getCasePages() {
 		return casePages;
 	}
 
-	public void setCasePages(Short casePages) {
+	public void setCasePages(Integer casePages) {
 		this.casePages = casePages;
 	}
 
 	@NotNull(message = "номер тома дела отсутствует")
 	@Column(name = "tom_number", insertable = false, updatable = false)
-	public Short getTomNumber() {
+	public Integer getTomNumber() {
 		return tomNumber;
 	}
 
-	public void setTomNumber(Short tomNumber) {
+	public void setTomNumber(Integer tomNumber) {
 		this.tomNumber = tomNumber;
 	}
 
