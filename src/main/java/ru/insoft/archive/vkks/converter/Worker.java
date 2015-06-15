@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
@@ -219,21 +220,21 @@ public class Worker extends Thread {
 					Files.createDirectories(pdfDir);
 					fillDeloSheet(wb, sheet, d, row);
 
-					int nextRow = fillDocsSheet(wb, wb.createSheet("Документы" + row), d.getDocuments(), pdfDir, dateStyle);
-
-					if (d.getCaseGraph() != null) {
-						/*
-						 setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
-						 setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
-						 row.createCell(4).setCellValue(doc.getDocTitle());
-						 createGraphDoc(doc.getPrikGraph(), pdfDir, pagesCell, linkCell);
-						 row.createCell(13).setCellValue(doc.getStartPage());
-						 */
-						//TODO: пункт 3.5 поставленной задачи ни в какие ворота не лезет. 
-//						createDocRecord(sheet.createRow(nextRow), new Document(), dateStyle, pdfDir);
-//						++stat.docs;
+					Sheet docSheet = wb.createSheet("Документы" + row);
+					String caseGraph = d.getCaseGraph();
+					int docRowNumber = 1;
+					if (caseGraph != null && !caseGraph.trim().isEmpty()) {
+						docRowNumber = fillDocsSheet(wb, docSheet, docRowNumber,
+								Arrays.<Document>asList(new Document(
+												d.getCaseNumber(), d.getEndDate(),
+												"Сканобраз обложки бумажного дела",
+												caseGraph,
+												"Сканобраз обложки бумажного дела"
+										)),
+								pdfDir, dateStyle);
 					}
 
+					fillDocsSheet(wb, docSheet, docRowNumber, d.getDocuments(), pdfDir, dateStyle);
 					++row;
 					updateInfo("Создано дело с номером " + caseNumber);
 					++stat.casesCreated;
@@ -288,20 +289,20 @@ public class Worker extends Thread {
 		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
 
 		sheet = wb.createSheet("Документы");
-		int nextRow = fillDocsSheet(wb, sheet, d.getDocuments(), pdfDir, dateStyle);
-
-		if (d.getCaseGraph() != null) {
-			/*
-			 setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
-			 setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
-			 row.createCell(4).setCellValue(doc.getDocTitle());
-			 createGraphDoc(doc.getPrikGraph(), pdfDir, pagesCell, linkCell);
-			 row.createCell(13).setCellValue(doc.getStartPage());
-			 */
-			//TODO: пункт 3.5 поставленной задачи ни в какие ворота не лезет. 
-//			createDocRecord(sheet.createRow(nextRow), new Document(), dateStyle, pdfDir);
-//			++stat.docs;
+		String caseGraph = d.getCaseGraph();
+		int docRowNumber = 1;
+		if (caseGraph != null && !caseGraph.trim().isEmpty()) {
+			docRowNumber = fillDocsSheet(wb, sheet, docRowNumber,
+					Arrays.<Document>asList(new Document(
+									d.getCaseNumber(), d.getEndDate(),
+									"Сканобраз обложки бумажного дела",
+									caseGraph,
+									"Сканобраз обложки бумажного дела"
+							)),
+					pdfDir, dateStyle);
 		}
+
+		fillDocsSheet(wb, sheet, docRowNumber, d.getDocuments(), pdfDir, dateStyle);
 
 		writeData(wb, file);
 	}
@@ -334,12 +335,11 @@ public class Worker extends Thread {
 	/**
 	 * Заполняет страницу документов
 	 */
-	private int fillDocsSheet(Workbook wb, Sheet sheet, List<Document> documents,
+	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, List<Document> documents,
 			Path pdfDir, CellStyle dateStyle) throws WrongPdfFile {
 		setHeaders(Config.docHeaders, wb, sheet);
 
 		int size = documents.size();
-		int rowNumber = 1;
 		for (int i = 0; i < size; ++i) {
 			Document doc = documents.get(i);
 			createDocRecord(sheet.createRow(rowNumber++), doc, dateStyle, pdfDir);

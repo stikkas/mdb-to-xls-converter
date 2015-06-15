@@ -52,6 +52,15 @@ public class Document implements Serializable {
 	public Document() {
 	}
 
+	public Document(String docNumber, Calendar docDate, String docTitle, String prikGraph,
+			String docType) {
+		this.docNumber = docNumber;
+		this.docDate = docDate;
+		this.docTitle = docTitle;
+		this.prikGraph = prikGraph;
+		this.docType = docType;
+	}
+
 	@Id
 	@Column(name = "ID1")
 	public Integer getId() {

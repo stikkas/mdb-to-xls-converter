@@ -34,7 +34,6 @@ public class Config {
 		"Страница №"
 	};
 
-
 	public static final String dbPrefix = "jdbc:ucanaccess://";
 
 	public static final String INIT_DIR_KEY = "workingDirecotry";
