@@ -2,12 +2,10 @@ package ru.insoft.archive.vkks.converter;
 
 import java.io.IOException;
 import javafx.application.Application;
-import javafx.event.EventHandler;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import javafx.stage.WindowEvent;
 import ru.insoft.archive.vkks.converter.control.ConverterController;
 
 /**
@@ -20,7 +18,7 @@ import ru.insoft.archive.vkks.converter.control.ConverterController;
  */
 public class ConverterUi extends Application {
 
-	private final static String TITLE = "Конвертор ПРИКАЗОВ ПО ЛИЧНОМУ СОСТАВУ";
+	private final static String TITLE = "Конвертор ДЕЛ ПОСТОЯННОГО ХРАНЕНИЯ";
 	private Stage stage;
 
 	@Override

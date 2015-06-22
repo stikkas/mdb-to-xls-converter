@@ -7,24 +7,20 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.RadioButton;
-import javafx.scene.control.Spinner;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
-import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.util.Pair;
+import javax.swing.JOptionPane;
 import ru.insoft.archive.vkks.converter.Config;
 import ru.insoft.archive.vkks.converter.ConverterUi;
 import ru.insoft.archive.vkks.converter.WorkMode;
@@ -39,7 +35,6 @@ public class ConverterController {
 	private ConverterUi app;
 	private FileChooser fileChooser;
 	private FileChooser saveLogChooser;
-	private DirectoryChooser dirChooser;
 	private Preferences prefs;
 	/**
 	 * Количество запущенных процессов конвертации
@@ -50,19 +45,11 @@ public class ConverterController {
 	 * Запущенные процессы конвертации, нужны для операции прерывания и для
 	 * отслеживания попытки запустить один и тотже процесс дважды.
 	 */
-	private static final Map<Pair<String, String>, Worker> runningWorkers = new HashMap<>();
+	private static final Map<String, Worker> runningWorkers = new HashMap<>();
 
-	@FXML
-	private Spinner<Integer> caseId;
-
-	@FXML
-	private CheckBox allCasesCheck;
 
 	@FXML
 	private TextArea logPanel;
-
-	@FXML
-	private TextField dataDirEdit;
 
 	@FXML
 	private TextField dbFileEdit;
@@ -76,33 +63,48 @@ public class ConverterController {
 	@FXML
 	private Button cancelButton;
 
-	/**
-	 * Формировать для каждого дела отдельный файл
-	 */
 	@FXML
-	private RadioButton everyRadio;
+	private NumberField caseIdEdit;
+
+	@FXML
+	private Label caseIdLabel;
+
+	@FXML
+	private NumberField year1Edit;
+
+	@FXML
+	private Label year1Label;
+
+	@FXML
+	private NumberField year2Edit;
+
+	@FXML
+	private Label year2Label;
+
+	@FXML
+	private ComboBox<String> modeBox;
 
 	/**
-	 * Формировать для одного года одного дела один файл
+	 * Список режимов работы
 	 */
-	@FXML
-	private RadioButton groupRadio;
+	private static final String[] modes = {
+		"формировать XLS файл для одного тома дела",
+		"формировать XLS файлы с томами по делу для указанного года",
+		"формировать XLS файлы с делами по подразделению для указанного года"};
 
-	private final ToggleGroup formatDst = new ToggleGroup();
+	private Map<String, Pair<Label, NumberField>> modesElements = new HashMap<>();
 
 	@FXML
 	private void onExec() {
-		String dir = dataDirEdit.getText();
 		String dbFile = dbFileEdit.getText();
-		Pair p = new Pair(dir, dbFile);
-		if (runningWorkers.containsKey(p)) {
-			logPanel.insertText(0, "Процесс для файла данных [" + dbFile
-					+ "] и папки назначения [" + dir + "] уже запущен.\n");
+		if (runningWorkers.containsKey(dbFile)) {
+			logPanel.insertText(0, "Процесс для файла данных [" + dbFile + "] уже запущен.\n");
 		} else {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
-					+ "]. Результат будет помещен в [" + dir + "].\n");
+					+ "].\n");
 			Worker w;
 
+			/*
 			if (caseId.isDisabled()) {
 				w = new Worker(dir, dbFileEdit.getText(), logPanel,
 						formatDst.getSelectedToggle() == everyRadio
@@ -111,13 +113,14 @@ public class ConverterController {
 				w = new Worker(dir, dbFileEdit.getText(), logPanel, WorkMode.BY_ID, caseId.getValue());
 			}
 
-			runningWorkers.put(p, w);
+			runningWorkers.put(dbFile, w);
 			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
 			w.doneProperty().addListener(e -> {
 				countWorkers.set(new AtomicInteger(countWorkers.get().decrementAndGet()));
-				runningWorkers.remove(p);
+				runningWorkers.remove(dbFile);
 			});
 			w.start();
+			*/
 		}
 	}
 
@@ -154,11 +157,6 @@ public class ConverterController {
 	}
 
 	@FXML
-	private void chooseDataDir() {
-		setPathEditValue(dirChooser.showDialog(app.getStage()), dataDirEdit);
-	}
-
-	@FXML
 	private void chooseDBFile() {
 		setPathEditValue(fileChooser.showOpenDialog(app.getStage()), dbFileEdit);
 	}
@@ -187,28 +185,15 @@ public class ConverterController {
 	}
 
 	/**
-	 * Создает диалог для выбора директории с xls файлами
-	 */
-	private void createDirChooser() {
-		dirChooser = new DirectoryChooser();
-		dirChooser.setTitle("Выбор директории для сохранения сконвертированных данных");
-	}
-
-	/**
 	 * Устанавливает доступность кнопки "Выполнить"
 	 */
 	private void setExecButtonEnabled() {
-		execButton.setDisable(dbFileEdit.getText().isEmpty()
-				|| dataDirEdit.getText().isEmpty());
+		execButton.setDisable(dbFileEdit.getText().isEmpty());
 	}
 
 	public void initialize() {
-		dbFileEdit.textProperty().addListener(e -> setExecButtonEnabled());
-		dataDirEdit.textProperty().addListener(e -> setExecButtonEnabled());
+		execButton.disableProperty().bind(dbFileEdit.textProperty().isEmpty());
 		createFileChooser();
-		createDirChooser();
-		fileChooser.initialDirectoryProperty().bindBidirectional(
-				dirChooser.initialDirectoryProperty());
 
 		// Выбираем сохраненный путь к последней выбранной папке
 		prefs = Preferences.userNodeForPackage(getClass());
@@ -217,24 +202,6 @@ public class ConverterController {
 			fileChooser.setInitialDirectory(new File(initDirectory));
 		}
 
-		formatDst.getToggles().addAll(everyRadio, groupRadio);
-
-		everyRadio.disableProperty().bind(caseId.disableProperty().not());
-		groupRadio.disableProperty().bind(caseId.disableProperty().not());
-		caseId.disableProperty().bind(allCasesCheck.selectedProperty());
-
-		// Настройка выбора только числовых значения для ID дела
-		caseId.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, Integer.MAX_VALUE));
-		caseId.getEditor().textProperty().addListener(e -> {
-			Integer value = 1;
-			try {
-				value = Integer.parseInt(caseId.getEditor().getText());
-			} catch (NumberFormatException ex) {
-				caseId.getEditor().setText(value.toString());
-			}
-			caseId.getValueFactory().setValue(value);
-		});
-
 		execButton.setTooltip(new Tooltip("Начать конвертацию выбранных данных"));
 		cancelButton.setTooltip(new Tooltip("Прервать конвертацию всех данных"));
 		saveLogButton.setTooltip(new Tooltip("Создать файл отчета работы конвертора"));
@@ -242,6 +209,25 @@ public class ConverterController {
 		saveLogButton.disableProperty().bind(logPanel.textProperty().isEmpty());
 		countWorkers.addListener(e -> {
 			cancelButton.setDisable(countWorkers.get().get() <= 0);
+		});
+
+		modesElements.put(modes[0], new Pair<>(caseIdLabel, caseIdEdit));
+		modesElements.put(modes[1], new Pair<>(year1Label, year1Edit));
+		modesElements.put(modes[2], new Pair<>(year2Label, year2Edit));
+		showModeOptions();
+
+		modeBox.getItems().addAll(modes);
+		modeBox.setValue(modes[0]);
+	}
+
+	private void showModeOptions() {
+		caseIdLabel.visibleProperty().bind(modeBox.valueProperty().isEqualTo(modes[0]));
+		modesElements.keySet().stream().map((key) -> {
+			Pair<Label, NumberField> p = modesElements.get(key);
+			p.getKey().visibleProperty().bind(modeBox.valueProperty().isEqualTo(key));
+			return p;
+		}).forEach((p) -> {
+			p.getValue().visibleProperty().bind(p.getKey().visibleProperty());
 		});
 	}
 
