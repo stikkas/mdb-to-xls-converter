@@ -19,7 +19,7 @@ import org.hibernate.validator.constraints.NotEmpty;
  * @author Благодатских С.
  */
 @Entity
-@Table(name = "Case")
+@Table(name = "Delo")
 public class Delo implements Serializable {
 
 	private static final long serialVersionUID = 1L;
@@ -28,9 +28,9 @@ public class Delo implements Serializable {
 
 	private Integer barcodeNumber;
 
-	private Integer raOpisNumber;
+	private String opis;
 
-	private Integer raCaseNumber;
+	private String caseDelo;
 
 	private String caseNumber;
 
@@ -44,7 +44,7 @@ public class Delo implements Serializable {
 
 	private String caseTitle;
 
-	private Integer casePages;
+	private Integer page;
 
 	private Integer tomNumber;
 
@@ -52,9 +52,9 @@ public class Delo implements Serializable {
 
 	private String source;
 
-	private String department;
+	private String sourcePred;
 
-	private String specificity;
+	private String especially;
 
 	private String caseRemark;
 
@@ -75,7 +75,7 @@ public class Delo implements Serializable {
 		this.id = id;
 	}
 
-	@Column(name = "barcode_number", insertable = false, updatable = false)
+	@Column(name = "Case_barcod", insertable = false, updatable = false)
 	public Integer getBarcodeNumber() {
 		return barcodeNumber;
 	}
@@ -84,26 +84,26 @@ public class Delo implements Serializable {
 		this.barcodeNumber = barcodeNumber;
 	}
 
-	@Column(name = "ra_opis_number", insertable = false, updatable = false)
-	public Integer getRaOpisNumber() {
-		return raOpisNumber;
+	@Column(name = "Case_opis", insertable = false, updatable = false)
+	public String getOpis() {
+		return opis;
 	}
 
-	public void setRaOpisNumber(Integer raOpisNumber) {
-		this.raOpisNumber = raOpisNumber;
+	public void setOpis(String opis) {
+		this.opis = opis;
 	}
 
-	@Column(name = "ra_case_number", insertable = false, updatable = false)
-	public Integer getRaCaseNumber() {
-		return raCaseNumber;
+	@Column(name = "Case_delo", insertable = false, updatable = false)
+	public String getCaseDelo() {
+		return caseDelo;
 	}
 
-	public void setRaCaseNumber(Integer raCaseNumber) {
-		this.raCaseNumber = raCaseNumber;
+	public void setCaseDelo(String caseDelo) {
+		this.caseDelo = caseDelo;
 	}
 
 	@NotEmpty(message = "номер дела отсутствует")
-	@Column(name = "case_number", insertable = false, updatable = false)
+	@Column(name = "Case_number", insertable = false, updatable = false)
 	public String getCaseNumber() {
 		return caseNumber;
 	}
@@ -113,7 +113,7 @@ public class Delo implements Serializable {
 	}
 
 	@NotNull(message = "начальная дата дела отсутствует")
-	@Column(name = "start_date", insertable = false, updatable = false)
+	@Column(name = "Date_start", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getStartDate() {
 		return startDate;
@@ -124,7 +124,7 @@ public class Delo implements Serializable {
 	}
 
 	@NotNull(message = "конечная дата дела отсутствует")
-	@Column(name = "end_date", insertable = false, updatable = false)
+	@Column(name = "Date_end", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getEndDate() {
 		return endDate;
@@ -134,7 +134,7 @@ public class Delo implements Serializable {
 		this.endDate = endDate;
 	}
 
-	@Column(name = "store_article", insertable = false, updatable = false)
+	@Column(name = "Article_storage_delo", insertable = false, updatable = false)
 	public String getStoreArticle() {
 		return storeArticle;
 	}
@@ -143,7 +143,7 @@ public class Delo implements Serializable {
 		this.storeArticle = storeArticle;
 	}
 
-	@Column(name = "store_life", insertable = false, updatable = false)
+	@Column(name = "Store_life", insertable = false, updatable = false)
 	public String getStoreLife() {
 		return storeLife;
 	}
@@ -153,7 +153,7 @@ public class Delo implements Serializable {
 	}
 
 	@NotEmpty(message = "название дела отсутствует")
-	@Column(name = "case_title", insertable = false, updatable = false)
+	@Column(name = "Delo_title", insertable = false, updatable = false)
 	public String getCaseTitle() {
 		return caseTitle;
 	}
@@ -162,17 +162,17 @@ public class Delo implements Serializable {
 		this.caseTitle = caseTitle;
 	}
 
-	@Column(name = "case_pages", insertable = false, updatable = false)
-	public Integer getCasePages() {
-		return casePages;
+	@Column(name = "Page_delo", insertable = false, updatable = false)
+	public Integer getPage() {
+		return page;
 	}
 
-	public void setCasePages(Integer casePages) {
-		this.casePages = casePages;
+	public void setPage(Integer page) {
+		this.page = page;
 	}
 
 	@NotNull(message = "номер тома дела отсутствует")
-	@Column(name = "tom_number", insertable = false, updatable = false)
+	@Column(name = "Number_tom", insertable = false, updatable = false)
 	public Integer getTomNumber() {
 		return tomNumber;
 	}
@@ -181,7 +181,7 @@ public class Delo implements Serializable {
 		this.tomNumber = tomNumber;
 	}
 
-	@Column(name = "part_number", insertable = false, updatable = false)
+	@Column(name = "Number_part", insertable = false, updatable = false)
 	public Integer getNumberPart() {
 		return numberPart;
 	}
@@ -190,7 +190,7 @@ public class Delo implements Serializable {
 		this.numberPart = numberPart;
 	}
 
-	@Column(name = "source", insertable = false, updatable = false)
+	@Column(name = "Source", insertable = false, updatable = false)
 	public String getSource() {
 		return source;
 	}
@@ -199,25 +199,25 @@ public class Delo implements Serializable {
 		this.source = source;
 	}
 
-	@Column(name = "department", insertable = false, updatable = false)
-	public String getDepartment() {
-		return department;
+	@Column(name = "Source_pred", insertable = false, updatable = false)
+	public String getSourcePred() {
+		return sourcePred;
 	}
 
-	public void setDepartment(String department) {
-		this.department = department;
+	public void setSourcePred(String sourcePred) {
+		this.sourcePred = sourcePred;
 	}
 
-	@Column(name = "specificity", insertable = false, updatable = false)
-	public String getSpecificity() {
-		return specificity;
+	@Column(name = "Especially", insertable = false, updatable = false)
+	public String getEspecially() {
+		return especially;
 	}
 
-	public void setSpecificity(String specificity) {
-		this.specificity = specificity;
+	public void setEspecially(String especially) {
+		this.especially = especially;
 	}
 
-	@Column(name = "case_remark", insertable = false, updatable = false)
+	@Column(name = "Remark_delo", insertable = false, updatable = false)
 	public String getCaseRemark() {
 		return caseRemark;
 	}
@@ -226,7 +226,7 @@ public class Delo implements Serializable {
 		this.caseRemark = caseRemark;
 	}
 
-	@Column(name = "case_graph", insertable = false, updatable = false)
+	@Column(name = "Graph_delo", insertable = false, updatable = false)
 	public String getCaseGraph() {
 		return caseGraph;
 	}

@@ -60,33 +60,29 @@ public class Worker extends Thread {
 	 */
 	private final BooleanProperty done = new SimpleBooleanProperty(false);
 
-	private final WorkMode mode;
-	private final Integer caseId;
+	private final String mode;
+	/**
+	 * Может содержать либо идентификатор дела, либо год, зависит от режима
+	 */
+	private final Integer idOrYear;
 	private final String xlsDir;
 	private final EntityManager em;
-	private final Path xlsDirPath;
 	private final TextArea logPanel;
-	private final String accessDbDir;
 	private final Stat stat = new Stat();
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 	private static final javax.validation.Validator validator
 			= Validation.buildDefaultValidatorFactory().getValidator();
 
-	public Worker(String xlsDir, String accessDb, TextArea logPanel, WorkMode mode) {
-		this(xlsDir, accessDb, logPanel, mode, null);
-	}
-
-	public Worker(String xlsDir, String accessDb, TextArea logPanel, WorkMode mode, Integer caseId) {
-		this.xlsDir = xlsDir;
+	
+	public Worker(String accessDb, TextArea logPanel, String mode, Integer idOrYear) {
+		this.xlsDir = Paths.get(accessDb).getParent().toString();
 		this.logPanel = logPanel;
 		this.mode = mode;
-		this.caseId = caseId;
+		this.idOrYear = idOrYear;
 
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
 		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
-		accessDbDir = Paths.get(accessDb).getParent().toString();
-		xlsDirPath = Paths.get(xlsDir);
 	}
 
 	/**
@@ -100,13 +96,13 @@ public class Worker extends Thread {
 	public void run() {
 		try {
 			switch (mode) {
-				case BY_ID:
+				case Config.ONE_VOLUME:
 					createForId();
 					break;
-				case CASE_XLS:
+				case Config.ONE_CASE_YEAR:
 					createForAll();
 					break;
-				default: // GROUP_CASE_XLS
+				default: // Config.CASES_YEAR
 					createForAllGroups();
 			}
 		} finally {
@@ -120,7 +116,7 @@ public class Worker extends Thread {
 	 * соответсвующие pdf
 	 */
 	private void createForId() {
-		Delo delo = em.find(Delo.class, caseId);
+		Delo delo = em.find(Delo.class, idOrYear);
 		if (delo == null) {
 			updateInfo("Дело не найдено");
 			return;
@@ -178,17 +174,13 @@ public class Worker extends Thread {
 
 				String fileName = getDirNameForDocuments(d);
 				Path fileXls = Paths.get(xlsDir, fileName + ".xls");
-				Path pdfDir = Paths.get(xlsDir, fileName);
-				Files.createDirectories(pdfDir);
-				createDelo(d, fileXls, pdfDir);
+				createDelo(d, fileXls);
 
 				updateInfo("Создано дело с номером " + caseNumber);
 				++stat.casesCreated;
 			}
 		} catch (WrongPdfFile | ErrorCreateXlsFile wex) {
 			updateInfo(wex.getMessage());
-		} catch (IOException ex) {
-			updateInfo("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
 		}
 	}
 
@@ -215,32 +207,26 @@ public class Worker extends Thread {
 			Delo d = delos.get(i);
 			if (checkDelo(d)) {
 				String caseNumber = d.getCaseNumber();
-				Path pdfDir = Paths.get(xlsDir, getDirNameForDocuments(d));
-				try {
-					Files.createDirectories(pdfDir);
-					fillDeloSheet(wb, sheet, d, row);
+				fillDeloSheet(wb, sheet, d, row);
 
-					Sheet docSheet = wb.createSheet("Документы" + row);
-					String caseGraph = d.getCaseGraph();
-					int docRowNumber = 1;
-					if (caseGraph != null && !caseGraph.trim().isEmpty()) {
-						docRowNumber = fillDocsSheet(wb, docSheet, docRowNumber,
-								Arrays.<Document>asList(new Document(
-												d.getCaseNumber(), d.getEndDate(),
-												"Сканобраз обложки бумажного дела",
-												caseGraph,
-												"Сканобраз обложки бумажного дела"
-										)),
-								pdfDir, dateStyle);
-					}
-
-					fillDocsSheet(wb, docSheet, docRowNumber, d.getDocuments(), pdfDir, dateStyle);
-					++row;
-					updateInfo("Создано дело с номером " + caseNumber);
-					++stat.casesCreated;
-				} catch (IOException ex) {
-					throw new IOException("Не могу создать директорию для дела " + caseNumber + ": " + ex.getMessage());
+				Sheet docSheet = wb.createSheet("Документы" + row);
+				String caseGraph = d.getCaseGraph();
+				int docRowNumber = 1;
+				if (caseGraph != null && !caseGraph.trim().isEmpty()) {
+					docRowNumber = fillDocsSheet(wb, docSheet, docRowNumber,
+							Arrays.<Document>asList(new Document(
+											d.getCaseNumber(), d.getEndDate(),
+											"Сканобраз обложки бумажного дела",
+											caseGraph,
+											"Сканобраз обложки бумажного дела"
+									)),
+							dateStyle);
 				}
+
+				fillDocsSheet(wb, docSheet, docRowNumber, d.getDocuments(), dateStyle);
+				++row;
+				updateInfo("Создано дело с номером " + caseNumber);
+				++stat.casesCreated;
 			}
 		}
 		try (OutputStream ous = Files.newOutputStream(Paths.get(xlsDir, xlsFileName))) {
@@ -275,9 +261,8 @@ public class Worker extends Thread {
 	 *
 	 * @param d дело
 	 * @param file путь к xls файлу
-	 * @param pdfDir директория для pdf файлов дела
 	 */
-	private void createDelo(Delo d, Path file, Path pdfDir) throws WrongPdfFile, ErrorCreateXlsFile {
+	private void createDelo(Delo d, Path file) throws WrongPdfFile, ErrorCreateXlsFile {
 
 		Workbook wb = new HSSFWorkbook();
 		Sheet sheet = wb.createSheet("Дело");
@@ -299,10 +284,10 @@ public class Worker extends Thread {
 									caseGraph,
 									"Сканобраз обложки бумажного дела"
 							)),
-					pdfDir, dateStyle);
+					dateStyle);
 		}
 
-		fillDocsSheet(wb, sheet, docRowNumber, d.getDocuments(), pdfDir, dateStyle);
+		fillDocsSheet(wb, sheet, docRowNumber, d.getDocuments(), dateStyle);
 
 		writeData(wb, file);
 	}
@@ -336,13 +321,13 @@ public class Worker extends Thread {
 	 * Заполняет страницу документов
 	 */
 	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, List<Document> documents,
-			Path pdfDir, CellStyle dateStyle) throws WrongPdfFile {
+			CellStyle dateStyle) throws WrongPdfFile {
 		setHeaders(Config.docHeaders, wb, sheet);
 
 		int size = documents.size();
 		for (int i = 0; i < size; ++i) {
 			Document doc = documents.get(i);
-			createDocRecord(sheet.createRow(rowNumber++), doc, dateStyle, pdfDir);
+			createDocRecord(sheet.createRow(rowNumber++), doc, dateStyle);
 			++stat.docs;
 		}
 		return rowNumber;
@@ -384,7 +369,7 @@ public class Worker extends Thread {
 	 * @param row
 	 * @param doc
 	 */
-	private void createDocRecord(Row row, Document doc, CellStyle style, Path pdfDir) throws WrongPdfFile {
+	private void createDocRecord(Row row, Document doc, CellStyle style) throws WrongPdfFile {
 		setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
 		setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
 		row.createCell(2);
@@ -399,13 +384,13 @@ public class Worker extends Thread {
 		Cell linkCell = row.createCell(9);
 		linkCell.setCellType(Cell.CELL_TYPE_STRING);
 
-		createGraphDoc(doc.getPrikGraph(), pdfDir, pagesCell, linkCell);
+		createGraphDoc(doc.getPrikGraph(), pagesCell, linkCell);
 
 		String dopGraph = doc.getDopGraph();
 		if (dopGraph != null) {
 			dopGraph = dopGraph.trim();
 			if (!dopGraph.isEmpty()) {
-				createGraphDoc(dopGraph, pdfDir, pagesCell, linkCell);
+				createGraphDoc(dopGraph, pagesCell, linkCell);
 			}
 		}
 		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
@@ -420,31 +405,19 @@ public class Worker extends Thread {
 	 * значение всех графических образов этого документа.
 	 *
 	 * @param graphLink ссылка на pdf
-	 * @param pdfDir директория, относительно которой записываются pdf файлы
 	 * @param pagesCell ячейка для записи кол-ва страниц
 	 * @param linkCell ячейка для записи путей к файлам, разделенных точкой с
 	 * запятой
 	 */
-	private void createGraphDoc(String graphLink, Path pdfDir, Cell pagesCell, Cell linkCell) throws WrongPdfFile {
+	private void createGraphDoc(String graphLink, Cell pagesCell, Cell linkCell) throws WrongPdfFile {
 		Path srcFile = getPathForLink(graphLink);
 		int pages = getPagesOfPdf(srcFile.toString());
 
-		Path dstFile = pdfDir.resolve(srcFile.getFileName());
-		if (!Files.exists(dstFile)) {
-			try {
-				Files.copy(srcFile, dstFile);
-			} catch (IOException ex) {
-				updateInfo("Ошибка копирования файла " + srcFile + " в "
-						+ pdfDir + ": " + ex.getMessage());
-			}
-		} else {
-			updateInfo("Файл " + dstFile + " уже существует");
-		}
-
-		int startIndex = xlsDirPath.getNameCount();
-		int endIndex = dstFile.getNameCount();
+//		Path dstFile = Paths.get(xlsDir).resolve(srcFile.getFileName());
+		int startIndex = Paths.get(xlsDir).getNameCount();
+		int endIndex = srcFile.getNameCount();
 		String relativeDstFileName = FilenameUtils.separatorsToWindows(
-				dstFile.subpath(startIndex, endIndex).toString());
+				srcFile.subpath(startIndex, endIndex).toString());
 
 		String paths = linkCell.getStringCellValue();
 		if (paths != null && !paths.trim().isEmpty()) {
@@ -494,7 +467,7 @@ public class Worker extends Thread {
 		if (link.endsWith("#")) {
 			link = link.substring(0, link.length() - 1);
 		}
-		return Paths.get(accessDbDir, FilenameUtils.separatorsToSystem(link));
+		return Paths.get(xlsDir, FilenameUtils.separatorsToSystem(link));
 	}
 
 	/**

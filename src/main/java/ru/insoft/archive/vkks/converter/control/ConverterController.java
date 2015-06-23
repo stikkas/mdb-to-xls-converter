@@ -14,16 +14,13 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.stage.FileChooser;
 import javafx.util.Pair;
-import javax.swing.JOptionPane;
 import ru.insoft.archive.vkks.converter.Config;
 import ru.insoft.archive.vkks.converter.ConverterUi;
-import ru.insoft.archive.vkks.converter.WorkMode;
 import ru.insoft.archive.vkks.converter.Worker;
 
 /**
@@ -46,7 +43,6 @@ public class ConverterController {
 	 * отслеживания попытки запустить один и тотже процесс дважды.
 	 */
 	private static final Map<String, Worker> runningWorkers = new HashMap<>();
-
 
 	@FXML
 	private TextArea logPanel;
@@ -84,16 +80,11 @@ public class ConverterController {
 	@FXML
 	private ComboBox<String> modeBox;
 
+	private final Map<String, Pair<Label, NumberField>> modesElements = new HashMap<>();
+
 	/**
-	 * Список режимов работы
+	 * Запуск конвертации
 	 */
-	private static final String[] modes = {
-		"формировать XLS файл для одного тома дела",
-		"формировать XLS файлы с томами по делу для указанного года",
-		"формировать XLS файлы с делами по подразделению для указанного года"};
-
-	private Map<String, Pair<Label, NumberField>> modesElements = new HashMap<>();
-
 	@FXML
 	private void onExec() {
 		String dbFile = dbFileEdit.getText();
@@ -102,16 +93,10 @@ public class ConverterController {
 		} else {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
 					+ "].\n");
-			Worker w;
 
-			/*
-			if (caseId.isDisabled()) {
-				w = new Worker(dir, dbFileEdit.getText(), logPanel,
-						formatDst.getSelectedToggle() == everyRadio
-								? WorkMode.CASE_XLS : WorkMode.GROUP_CASE_XLS);
-			} else {
-				w = new Worker(dir, dbFileEdit.getText(), logPanel, WorkMode.BY_ID, caseId.getValue());
-			}
+			String mode = modeBox.getValue();
+			Worker w = new Worker(dbFileEdit.getText(), logPanel, mode,
+					modesElements.get(mode).getValue().getValue());
 
 			runningWorkers.put(dbFile, w);
 			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
@@ -120,10 +105,12 @@ public class ConverterController {
 				runningWorkers.remove(dbFile);
 			});
 			w.start();
-			*/
 		}
 	}
 
+	/**
+	 * Сохраняем информацию из TextArea в файл
+	 */
 	@FXML
 	private void onSaveLog() {
 		if (saveLogChooser == null) {
@@ -184,13 +171,6 @@ public class ConverterController {
 		fileChooser.setTitle("Выбор файла mdb с данными");
 	}
 
-	/**
-	 * Устанавливает доступность кнопки "Выполнить"
-	 */
-	private void setExecButtonEnabled() {
-		execButton.setDisable(dbFileEdit.getText().isEmpty());
-	}
-
 	public void initialize() {
 		execButton.disableProperty().bind(dbFileEdit.textProperty().isEmpty());
 		createFileChooser();
@@ -211,17 +191,19 @@ public class ConverterController {
 			cancelButton.setDisable(countWorkers.get().get() <= 0);
 		});
 
-		modesElements.put(modes[0], new Pair<>(caseIdLabel, caseIdEdit));
-		modesElements.put(modes[1], new Pair<>(year1Label, year1Edit));
-		modesElements.put(modes[2], new Pair<>(year2Label, year2Edit));
+		modesElements.put(Config.ONE_VOLUME, new Pair<>(caseIdLabel, caseIdEdit));
+		modesElements.put(Config.ONE_CASE_YEAR, new Pair<>(year1Label, year1Edit));
+		modesElements.put(Config.CASES_YEAR, new Pair<>(year2Label, year2Edit));
 		showModeOptions();
 
-		modeBox.getItems().addAll(modes);
-		modeBox.setValue(modes[0]);
+		modeBox.getItems().addAll(modesElements.keySet());
+		modeBox.setValue(Config.ONE_VOLUME);
 	}
 
+	/**
+	 * Устанавливает взаимодействие между выбором режима и параметрами режима
+	 */
 	private void showModeOptions() {
-		caseIdLabel.visibleProperty().bind(modeBox.valueProperty().isEqualTo(modes[0]));
 		modesElements.keySet().stream().map((key) -> {
 			Pair<Label, NumberField> p = modesElements.get(key);
 			p.getKey().visibleProperty().bind(modeBox.valueProperty().isEqualTo(key));

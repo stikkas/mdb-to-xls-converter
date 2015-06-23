@@ -43,6 +43,8 @@ public class Document implements Serializable {
 
 	private String docPages;
 
+	private Document main;
+
 	private String docRemark;
 
 	private String prikGraph;
@@ -71,7 +73,8 @@ public class Document implements Serializable {
 		this.id = id;
 	}
 
-	@JoinColumn(name = "PARENT_ID", referencedColumnName = "ID", insertable = false, updatable = false)
+	@NotNull
+	@JoinColumn(name = "Parent_ID", referencedColumnName = "ID", insertable = false, updatable = false)
 	@ManyToOne(fetch = FetchType.EAGER)
 	public Delo getDelo() {
 		return delo;
@@ -81,9 +84,15 @@ public class Document implements Serializable {
 		this.delo = delo;
 	}
 
-	@NotEmpty(message = "номер документа отсутствует")
-	@Column(name = "doc_number", insertable = false, updatable = false)
+	@Column(name = "Doc_number", insertable = false, updatable = false)
 	public String getDocNumber() {
+		if (docNumber == null || docNumber.trim().isEmpty()) {
+			if (main != null) {
+				return "к " + main.getDocNumber();
+			} else {
+				return "без №";
+			}
+		}
 		return docNumber;
 	}
 
@@ -91,10 +100,16 @@ public class Document implements Serializable {
 		this.docNumber = docNumber;
 	}
 
-	@NotNull(message = "дата документа отсутствует")
-	@Column(name = "doc_date", insertable = false, updatable = false)
+	@Column(name = "Date_doc", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getDocDate() {
+		if (docDate == null) {
+			if (main != null) {
+				return main.getDocDate();
+			} else {
+				return delo.getEndDate();
+			}
+		}
 		return docDate;
 	}
 
@@ -147,6 +162,16 @@ public class Document implements Serializable {
 
 	public void setDocPages(String docPages) {
 		this.docPages = docPages;
+	}
+
+	@JoinColumn(name = "ID_main", referencedColumnName = "ID1", insertable = false, updatable = false)
+	@ManyToOne(fetch = FetchType.EAGER)
+	public Document getIdMain() {
+		return main;
+	}
+
+	public void setMain(Document main) {
+		this.main = main;
 	}
 
 	@Column(name = "doc_remark", insertable = false, updatable = false)

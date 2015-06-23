@@ -16,6 +16,9 @@ public class Config {
 		"Дата дела  по",
 		"Примечание"
 	};
+	public static final String ONE_VOLUME = "формировать XLS файл для одного тома дела";
+	public static final String ONE_CASE_YEAR = "формировать XLS файлы с томами по делу для указанного года";
+	public static final String CASES_YEAR = "формировать XLS файлы с делами по подразделению для указанного года";
 
 	public static final String[] docHeaders = {
 		"№ регистрации",
