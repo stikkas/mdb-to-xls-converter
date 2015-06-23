@@ -518,7 +518,7 @@ public class Worker extends Thread {
 				if (mainId != null && !mainId.trim().isEmpty()) {
 					try {
 						Integer id = Integer.parseInt(mainId);
-						doc.setMain(delo.getDocuments().stream().filter(d -> Objects.equals(d.getId(), id)).findFirst().get());
+						doc.setMain(delo.getDocuments().stream().filter(d -> Objects.equals(d.getId(), id)).findFirst().orElse(null));
 					} catch (NumberFormatException e) {
 
 					}
