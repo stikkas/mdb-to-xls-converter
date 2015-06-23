@@ -131,7 +131,7 @@ public class Worker extends Thread {
 				.collect(Collectors.groupingBy(delo -> delo.getCaseNumber()))
 				.entrySet()) {
 
-			if (!convertFewDelo(e.getValue())) {
+			if (!convertFewDelo(e.getValue(), e.getKey() + "_" + idOrYear)) {
 				break;
 			}
 		}
@@ -149,15 +149,17 @@ public class Worker extends Thread {
 				.collect(Collectors.groupingBy(delo -> {
 					String[] parts = delo.getCaseNumber().split("-");
 					if (parts.length > 1) {
-						List<String> ps = Arrays.asList(parts);
-						ps.remove(ps.size() - 1);
-						return String.join("-", ps);
+						List<String> strings = new ArrayList<>();
+						for (int i = 0; i < parts.length - 1; ++i) {
+							strings.add(parts[i]);
+						}
+						return String.join("-", strings);
 					} else {
 						return parts[0];
 					}
 				}))
 				.entrySet()) {
-			if (!convertFewDelo(e.getValue())) {
+			if (!convertFewDelo(e.getValue(), e.getKey() + "_" + idOrYear)) {
 				break;
 			}
 		}
@@ -190,9 +192,10 @@ public class Worker extends Thread {
 	 * файловое дерево
 	 *
 	 * @param dela записи из mdb
+	 * @param fileName имя файла для записи данных
 	 * @return в случае сигнала прервать операцию возвращаем false
 	 */
-	private boolean convertFewDelo(List<Delo> dela) {
+	private boolean convertFewDelo(List<Delo> dela, String fileName) {
 
 		Workbook wb = new HSSFWorkbook();
 		Sheet deloSheet = wb.createSheet("Дело");
@@ -214,8 +217,7 @@ public class Worker extends Thread {
 		if (!dela.isEmpty()) {
 			Delo d = dela.get(0);
 			try {
-				writeData(wb, Paths.get(xlsDir, d.getCaseNumber() + "_"
-						+ d.getStartDate().get(Calendar.YEAR) + ".xls"));
+				writeData(wb, Paths.get(xlsDir, fileName + ".xls"));
 			} catch (ErrorCreateXlsFile ex) {
 				updateInfo(ex.getMessage());
 			}
