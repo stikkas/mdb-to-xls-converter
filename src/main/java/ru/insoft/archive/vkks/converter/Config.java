@@ -1,5 +1,7 @@
 package ru.insoft.archive.vkks.converter;
 
+import java.text.SimpleDateFormat;
+
 /**
  * Общий настройечный класс для всего приложения.
  *
@@ -19,7 +21,10 @@ public class Config {
 	public static final String ONE_VOLUME = "формировать XLS файл для одного тома дела";
 	public static final String ONE_CASE_YEAR = "формировать XLS файлы с томами по делу для указанного года";
 	public static final String CASES_YEAR = "формировать XLS файлы с делами по подразделению для указанного года";
+	public static final String D_TYPE_INNER_OPIS = "Внутренняя опись";
+	public static final String D_TYPE_LIST_ZAV = "Лист-заверитель";
 
+	public static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 	public static final String[] docHeaders = {
 		"№ регистрации",
 		"Дата регистрации",

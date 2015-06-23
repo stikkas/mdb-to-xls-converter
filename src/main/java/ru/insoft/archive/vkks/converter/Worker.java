@@ -1,17 +1,17 @@
 package ru.insoft.archive.vkks.converter;
 
-import com.itextpdf.text.pdf.PdfReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,7 +23,6 @@ import javax.persistence.EntityManager;
 import javax.persistence.Persistence;
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -36,7 +35,6 @@ import static ru.insoft.archive.vkks.converter.Config.dbPrefix;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.error.ErrorCreateXlsFile;
-import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
 
 /**
  * Обрабатывает xls файлы, сопоставляя их с данными в базе. Также копирует pdf
@@ -69,11 +67,9 @@ public class Worker extends Thread {
 	private final EntityManager em;
 	private final TextArea logPanel;
 	private final Stat stat = new Stat();
-	private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 	private static final javax.validation.Validator validator
 			= Validation.buildDefaultValidatorFactory().getValidator();
 
-	
 	public Worker(String accessDb, TextArea logPanel, String mode, Integer idOrYear) {
 		this.xlsDir = Paths.get(accessDb).getParent().toString();
 		this.logPanel = logPanel;
@@ -100,10 +96,10 @@ public class Worker extends Thread {
 					createForId();
 					break;
 				case Config.ONE_CASE_YEAR:
-					createForAll();
+					createVolumes();
 					break;
 				default: // Config.CASES_YEAR
-					createForAllGroups();
+					createUnits();
 			}
 		} finally {
 			updateInfo(stat.toString());
@@ -112,8 +108,7 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Выбирает из базы дело с заданным ID и формирует для него xls и копирует
-	 * соответсвующие pdf
+	 * Выбирает из базы дело с заданным ID и формирует для него xls
 	 */
 	private void createForId() {
 		Delo delo = em.find(Delo.class, idOrYear);
@@ -126,38 +121,46 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Формирует для каждой записи в таблице Case отдельный xls и копирует
-	 * соответсвующие pdf
+	 * Формирует файлы для дел за определненный год, сгруппированных по номеру
+	 * дела.
 	 */
-	private void createForAll() {
-		((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class).getResultList()).forEach(d -> {
-			if (!commit) {
-				++stat.cases;
-				convertOneDelo(d);
-			}
-		});
-	}
-
-	/**
-	 * Формирует для каждой группы томов одного дела за один год отдельный xls и
-	 * копирует соответствующие pdf. Год берется из поля end_date.
-	 */
-	private void createForAllGroups() {
-		for (Entry<GroupDeloKey, List<Delo>> e : ((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class)
+	private void createVolumes() {
+		for (Entry<String, List<Delo>> e : ((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class)
 				.getResultList()).stream()
-				.collect(Collectors.groupingBy(delo
-								-> new GroupDeloKey(delo.getEndDate().get(Calendar.YEAR), delo.getCaseNumber())))
+				.filter(d -> d.getStartDate().get(Calendar.YEAR) == idOrYear)
+				.collect(Collectors.groupingBy(delo -> delo.getCaseNumber()))
 				.entrySet()) {
 
-			try {
-				if (!createOpis(e.getKey(), e.getValue())) {
-					break;
-				}
-			} catch (WrongPdfFile | IOException wex) {
-				updateInfo(wex.getMessage());
+			if (!convertFewDelo(e.getValue())) {
+				break;
 			}
 		}
 
+	}
+
+	/**
+	 * Формирует файлы дел за определенный год, сгруппированных по
+	 * подразделениям
+	 */
+	private void createUnits() {
+		for (Entry<String, List<Delo>> e : ((List<Delo>) em.createQuery("SELECT d FROM Delo d", Delo.class)
+				.getResultList()).stream()
+				.filter(d -> d.getStartDate().get(Calendar.YEAR) == idOrYear)
+				.collect(Collectors.groupingBy(delo -> {
+					String[] parts = delo.getCaseNumber().split("-");
+					if (parts.length > 1) {
+						List<String> ps = Arrays.asList(parts);
+						ps.remove(ps.size() - 1);
+						return String.join("-", ps);
+					} else {
+						return parts[0];
+					}
+				}))
+				.entrySet()) {
+			if (!convertFewDelo(e.getValue())) {
+				break;
+			}
+		}
 	}
 
 	/**
@@ -167,114 +170,81 @@ public class Worker extends Thread {
 	 * @param d запись из mdb
 	 */
 	private void convertOneDelo(Delo d) {
-		String caseNumber = null;
 		try {
 			if (checkDelo(d)) {
-				caseNumber = d.getCaseNumber();
+				Workbook wb = new HSSFWorkbook();
 
-				String fileName = getDirNameForDocuments(d);
-				Path fileXls = Paths.get(xlsDir, fileName + ".xls");
-				createDelo(d, fileXls);
+				createDelo(d, wb.createSheet("Дело"), wb, 1, true);
 
-				updateInfo("Создано дело с номером " + caseNumber);
+				writeData(wb, Paths.get(xlsDir, getXlsFileName(d)));
+				updateInfo("Создано дело с номером " + d.getCaseNumber());
 				++stat.casesCreated;
 			}
-		} catch (WrongPdfFile | ErrorCreateXlsFile wex) {
+		} catch (ErrorCreateXlsFile wex) {
 			updateInfo(wex.getMessage());
 		}
 	}
 
 	/**
-	 * Создает файл с описью для нескольких дел
+	 * Конвертирует данные из mdb для нескольких записей в таблице Delo в
+	 * файловое дерево
+	 *
+	 * @param dela записи из mdb
+	 * @return в случае сигнала прервать операцию возвращаем false
 	 */
-	private boolean createOpis(GroupDeloKey key, List<Delo> delos) throws WrongPdfFile, IOException {
+	private boolean convertFewDelo(List<Delo> dela) {
+
 		Workbook wb = new HSSFWorkbook();
-
-		CellStyle dateStyle = wb.createCellStyle();
-		DataFormat df = wb.createDataFormat();
-		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
-
-		Sheet sheet = wb.createSheet("Дело");
-		setHeaders(Config.deloHeaders, wb, sheet);
-		int size = delos.size();
-		int row = 1;
-		String xlsFileName = key.toString() + ".xls";
-		for (int i = 0; i < size; ++i) {
+		Sheet deloSheet = wb.createSheet("Дело");
+		boolean createHeaders = true;
+		int rowNumber = 1;
+		for (Delo d : dela) {
 			if (commit) {
 				return false;
 			}
 			++stat.cases;
-			Delo d = delos.get(i);
 			if (checkDelo(d)) {
-				String caseNumber = d.getCaseNumber();
-				fillDeloSheet(wb, sheet, d, row);
-
-				Sheet docSheet = wb.createSheet("Документы" + row);
-				String caseGraph = d.getCaseGraph();
-				int docRowNumber = 1;
-				if (caseGraph != null && !caseGraph.trim().isEmpty()) {
-					docRowNumber = fillDocsSheet(wb, docSheet, docRowNumber,
-							Arrays.<Document>asList(new Document(
-											d.getCaseNumber(), d.getEndDate(),
-											"Сканобраз обложки бумажного дела",
-											caseGraph,
-											"Сканобраз обложки бумажного дела"
-									)),
-							dateStyle);
-				}
-
-				fillDocsSheet(wb, docSheet, docRowNumber, d.getDocuments(), dateStyle);
-				++row;
-				updateInfo("Создано дело с номером " + caseNumber);
+				createDelo(d, deloSheet, wb, rowNumber++, createHeaders);
+				createHeaders = false;
+				updateInfo("Создано дело с номером " + d.getCaseNumber());
 				++stat.casesCreated;
 			}
 		}
-		try (OutputStream ous = Files.newOutputStream(Paths.get(xlsDir, xlsFileName))) {
-			wb.write(ous);
-		} catch (IOException ex) {
-			updateInfo(String.format("Не могу создать файл %s: %s", xlsFileName, ex.getMessage()));
+
+		if (!dela.isEmpty()) {
+			Delo d = dela.get(0);
+			try {
+				writeData(wb, Paths.get(xlsDir, d.getCaseNumber() + "_"
+						+ d.getStartDate().get(Calendar.YEAR) + ".xls"));
+			} catch (ErrorCreateXlsFile ex) {
+				updateInfo(ex.getMessage());
+			}
+		} else {
+			updateInfo("Для заданного года - " + idOrYear + " дела не найдены");
 		}
 		return true;
 	}
 
 	/**
-	 * Возвращает название папки куда будут складываться документы дела
-	 *
-	 * @param d дело
-	 * @return
+	 * Создает запись о деле в листе Дело, и записи документов дела в листе
+	 * Документы
 	 */
-	private String getDirNameForDocuments(Delo d) {
-		String fileName = d.getCaseNumber() + "_"
-				+ sdf.format(d.getStartDate().getTime()) + "-"
-				+ sdf.format(d.getEndDate().getTime());
+	private void createDelo(Delo d, Sheet dela, Workbook wb, int deloRowNumber, boolean createHeaders) {
 
-		while (createdFileNames.contains(fileName)) {
-			fileName += "_1";
+		if (createHeaders) {
+			setHeaders(Config.deloHeaders, wb, dela);
 		}
 
-		createdFileNames.add(fileName);
-		return fileName;
-	}
-
-	/**
-	 * Создает файл с делом
-	 *
-	 * @param d дело
-	 * @param file путь к xls файлу
-	 */
-	private void createDelo(Delo d, Path file) throws WrongPdfFile, ErrorCreateXlsFile {
-
-		Workbook wb = new HSSFWorkbook();
-		Sheet sheet = wb.createSheet("Дело");
-		setHeaders(Config.deloHeaders, wb, sheet);
-		fillDeloSheet(wb, sheet, d, 1);
+		fillDeloSheet(wb, dela, d, deloRowNumber);
 
 		CellStyle dateStyle = wb.createCellStyle();
 		DataFormat df = wb.createDataFormat();
 		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
 
-		sheet = wb.createSheet("Документы");
+		Sheet sheet = wb.createSheet("Документы" + deloRowNumber);
 		String caseGraph = d.getCaseGraph();
+		createHeaders = true;
+
 		int docRowNumber = 1;
 		if (caseGraph != null && !caseGraph.trim().isEmpty()) {
 			docRowNumber = fillDocsSheet(wb, sheet, docRowNumber,
@@ -282,14 +252,67 @@ public class Worker extends Thread {
 									d.getCaseNumber(), d.getEndDate(),
 									"Сканобраз обложки бумажного дела",
 									caseGraph,
-									"Сканобраз обложки бумажного дела"
-							)),
-					dateStyle);
+									"Сканобраз обложки бумажного дела", d)),
+					dateStyle, createHeaders);
+			createHeaders = false;
+		}
+		List<Document> documents = new ArrayList<>();
+		List<Document> opisis = new ArrayList<>();
+		List<Document> zaveritels = new ArrayList<>();
+
+		// Разбираем документы на просто документы и на листы-заверители и внутренние описи
+		for (Document doc : d.getDocuments()) {
+			String docType = doc.getDocType();
+			if (docType != null) {
+				docType = docType.trim();
+				switch (docType) {
+					case Config.D_TYPE_INNER_OPIS:
+						opisis.add(new Document(d.getCaseNumber() + " том "
+								+ d.getTomNumber(),
+								d.getEndDate(),
+								Config.D_TYPE_INNER_OPIS, doc.getPrikGraph(),
+								Config.D_TYPE_INNER_OPIS, d));
+						break;
+					case Config.D_TYPE_LIST_ZAV:
+						zaveritels.add(new Document(d.getCaseNumber() + " том "
+								+ d.getTomNumber(),
+								d.getEndDate(),
+								Config.D_TYPE_LIST_ZAV,
+								doc.getPrikGraph(),
+								Config.D_TYPE_LIST_ZAV, d));
+						break;
+					default:
+						documents.add(doc);
+				}
+			} else {
+				documents.add(doc);
+			}
 		}
 
-		fillDocsSheet(wb, sheet, docRowNumber, d.getDocuments(), dateStyle);
+		docRowNumber = fillDocsSheet(wb, sheet, docRowNumber, opisis, dateStyle, createHeaders);
+		docRowNumber = fillDocsSheet(wb, sheet, docRowNumber, documents, dateStyle, false);
+		fillDocsSheet(wb, sheet, docRowNumber, zaveritels, dateStyle, false);
 
-		writeData(wb, file);
+	}
+
+	/**
+	 * Возвращает название файла xls для записи конвертированных данных
+	 *
+	 * @param d дело
+	 * @return
+	 */
+	private String getXlsFileName(Delo d) {
+		String fileName = d.getCaseNumber() + "_"
+				+ Config.sdf.format(d.getStartDate().getTime()) + "-"
+				+ Config.sdf.format(d.getEndDate().getTime());
+
+		if (createdFileNames.contains(fileName)) {
+			int index = 1;
+			for (; createdFileNames.contains(fileName + "_" + index); ++index);
+			fileName += "_" + index;
+			createdFileNames.add(fileName);
+		}
+		return fileName + ".xls";
 	}
 
 	/**
@@ -321,13 +344,15 @@ public class Worker extends Thread {
 	 * Заполняет страницу документов
 	 */
 	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, List<Document> documents,
-			CellStyle dateStyle) throws WrongPdfFile {
-		setHeaders(Config.docHeaders, wb, sheet);
+			CellStyle dateStyle, boolean createHeaders) {
+		if (createHeaders) {
+			setHeaders(Config.docHeaders, wb, sheet);
+		}
 
 		int size = documents.size();
 		for (int i = 0; i < size; ++i) {
 			Document doc = documents.get(i);
-			createDocRecord(sheet.createRow(rowNumber++), doc, dateStyle);
+			createDocRecord(sheet.createRow(rowNumber++), doc, documents, i, dateStyle);
 			++stat.docs;
 		}
 		return rowNumber;
@@ -356,20 +381,18 @@ public class Worker extends Thread {
 					break;
 				case CALENDAR:
 					cell.setCellType(Cell.CELL_TYPE_NUMERIC);
-					cell.setCellValue(sdf.format(((Calendar) value).getTime()));
+					cell.setCellValue(Config.sdf.format(((Calendar) value).getTime()));
 				case CALENDAR1:
-					cell.setCellValue(sdf.format(((Calendar) value).getTime()));
+					cell.setCellValue(Config.sdf.format(((Calendar) value).getTime()));
 			}
 		}
 	}
 
 	/**
 	 * Создает запись для документа
-	 *
-	 * @param row
-	 * @param doc
 	 */
-	private void createDocRecord(Row row, Document doc, CellStyle style) throws WrongPdfFile {
+	private void createDocRecord(Row row, Document doc, List<Document> docs, int index,
+			CellStyle style) {
 		setCellValue(row.createCell(0), doc.getDocNumber(), ValueType.STRING);
 		setCellValue(row.createCell(1), doc.getDocDate(), ValueType.CALENDAR1, style);
 		row.createCell(2);
@@ -378,55 +401,14 @@ public class Worker extends Thread {
 		row.createCell(5);
 		row.createCell(6);
 
-		Cell pagesCell = row.createCell(7);
-		pagesCell.setCellType(Cell.CELL_TYPE_NUMERIC);
+		setCellValue(row.createCell(7), countPages(doc, docs, index), ValueType.INTEGER);
+
 		setCellValue(row.createCell(8), doc.getDocRemark(), ValueType.STRING);
-		Cell linkCell = row.createCell(9);
-		linkCell.setCellType(Cell.CELL_TYPE_STRING);
-
-		createGraphDoc(doc.getPrikGraph(), pagesCell, linkCell);
-
-		String dopGraph = doc.getDopGraph();
-		if (dopGraph != null) {
-			dopGraph = dopGraph.trim();
-			if (!dopGraph.isEmpty()) {
-				createGraphDoc(dopGraph, pagesCell, linkCell);
-			}
-		}
+		setCellValue(row.createCell(9), getPdfLink(doc.getPrikGraph()), ValueType.STRING);
 		setCellValue(row.createCell(10), doc.getDocType(), ValueType.STRING);
 		row.createCell(11);
 		row.createCell(12);
 		row.createCell(13).setCellValue(doc.getStartPage());
-	}
-
-	/**
-	 * Копирует pdf файлы документа в нужное место и записывает данные о
-	 * документе в лист "Документы". в ячейке страниц прописывается суммарное
-	 * значение всех графических образов этого документа.
-	 *
-	 * @param graphLink ссылка на pdf
-	 * @param pagesCell ячейка для записи кол-ва страниц
-	 * @param linkCell ячейка для записи путей к файлам, разделенных точкой с
-	 * запятой
-	 */
-	private void createGraphDoc(String graphLink, Cell pagesCell, Cell linkCell) throws WrongPdfFile {
-		Path srcFile = getPathForLink(graphLink);
-		int pages = getPagesOfPdf(srcFile.toString());
-
-//		Path dstFile = Paths.get(xlsDir).resolve(srcFile.getFileName());
-		int startIndex = Paths.get(xlsDir).getNameCount();
-		int endIndex = srcFile.getNameCount();
-		String relativeDstFileName = FilenameUtils.separatorsToWindows(
-				srcFile.subpath(startIndex, endIndex).toString());
-
-		String paths = linkCell.getStringCellValue();
-		if (paths != null && !paths.trim().isEmpty()) {
-			paths += ";" + relativeDstFileName;
-		} else {
-			paths = relativeDstFileName;
-		}
-		linkCell.setCellValue(paths);
-		pagesCell.setCellValue((int) pagesCell.getNumericCellValue() + pages);
 	}
 
 	/**
@@ -453,38 +435,49 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Преобразует ссылку из базы данных в абсолютный путь к исходному файлу. В
-	 * базе данных ссылка представлена в Windows формате.
+	 * Преобразует ссылку из базы данных в относительный путь к исходному файлу.
+	 * В базе данных ссылка представлена в Windows формате. Удаляются лишние
+	 * символы на начале и конце.
 	 *
 	 * @param link ссылка на файл данных
-	 * @return пусть к файлу
+	 * @return путь к файлу в Windows формате
 	 */
-	private Path getPathForLink(String link) {
-		link = link.trim();
-		if (link.startsWith("#")) {
-			link = link.substring(1);
+	private String getPdfLink(String link) {
+		if (link != null) {
+			link = link.trim();
+			if (link.startsWith("#")) {
+				link = link.substring(1);
+			}
+			if (link.endsWith("#")) {
+				link = link.substring(0, link.length() - 1);
+			}
 		}
-		if (link.endsWith("#")) {
-			link = link.substring(0, link.length() - 1);
-		}
-		return Paths.get(xlsDir, FilenameUtils.separatorsToSystem(link));
+		return link;
 	}
 
 	/**
-	 * Получает кол-во страниц в pdf документе
+	 * Определяем кол-во страниц документа
 	 *
-	 * @param filename имя файла
+	 * @param doc документ
+	 * @param docs документы дела
+	 * @param index индекс данного документа среди документов дела
 	 * @return количество страниц
 	 */
-	private int getPagesOfPdf(String filename) throws WrongPdfFile {
-		try {
-			PdfReader reader = new PdfReader(filename);
-			int pages = reader.getNumberOfPages();
-			reader.close();
-			return pages;
-		} catch (IOException ex) {
-			throw new WrongPdfFile("Невозможно получить кол-во страниц " + filename + ": " + ex.getMessage());
+	private int countPages(Document doc, List<Document> docs, int index) {
+		if (index == docs.size() - 1) { // Последний документ
+			return 1;
 		}
+
+		Integer startPage = doc.getNumberPage();
+		if (startPage == null) {
+			return 1;
+		}
+
+		Integer endPage = docs.get(index + 1).getNumberPage();
+		if (endPage == null) {
+			return 1;
+		}
+		return endPage - startPage;
 	}
 
 	/**
@@ -501,7 +494,7 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Проверяет правильность оформления дела и его документов
+	 * Проверяет правильность оформления дела
 	 *
 	 * @param delo интересуемое дело
 	 * @return в случае правильного оформления - true, иначе - false
@@ -516,23 +509,21 @@ public class Worker extends Thread {
 			for (ConstraintViolation<Delo> error : errors) {
 				builder.append("\t").append(error.getMessage());
 			}
-		}
+		} else { // Т.к. в поле id_main может хранится разная чушь, а не только id
+			// То приходится писать такой гавнокод.
+			for (Document doc : delo.getDocuments()) {
+				String mainId = doc.getMainId();
+				if (mainId != null && !mainId.trim().isEmpty()) {
+					try {
+						Integer id = Integer.parseInt(mainId);
+						doc.setMain(delo.getDocuments().stream().filter(d -> Objects.equals(d.getId(), id)).findFirst().get());
+					} catch (NumberFormatException e) {
 
-		for (Document doc : delo.getDocuments()) {
-			Set<ConstraintViolation<Document>> docErrors = validator.validate(doc);
-			if (!docErrors.isEmpty()) {
-				valid = false;
-				if (builder == null) {
-					builder = new StringBuilder(String
-							.format("Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
-				}
-				builder.append("\t").append("документ с ID = ").append(doc.getId())
-						.append(" имеет следующие ошибки:\n");
-				for (ConstraintViolation<Document> error : docErrors) {
-					builder.append("\t\t").append(error.getMessage());
+					}
 				}
 			}
 		}
+
 		if (builder != null) {
 			updateInfo(builder.toString());
 		}
