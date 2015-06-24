@@ -5,7 +5,7 @@
 <?import javafx.scene.control.*?>
 <?import java.lang.*?>
 <?import javafx.scene.layout.*?>
-<?import ru.insoft.archive.vkks.converter.control.NumberField?>
+<?import ru.insoft.archive.vkks.converter.control.*?>
 
 <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="518.0" prefWidth="686.0" xmlns="http://javafx.com/javafx/8.0.40" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.insoft.archive.vkks.converter.control.ConverterController">
    <children>

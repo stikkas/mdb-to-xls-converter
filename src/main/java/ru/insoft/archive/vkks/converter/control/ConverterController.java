@@ -191,13 +191,12 @@ public class ConverterController {
 			cancelButton.setDisable(countWorkers.get().get() <= 0);
 		});
 
-		modesElements.put(Config.ONE_VOLUME, new Pair<>(caseIdLabel, caseIdEdit));
-		modesElements.put(Config.ONE_CASE_YEAR, new Pair<>(year1Label, year1Edit));
-		modesElements.put(Config.CASES_YEAR, new Pair<>(year2Label, year2Edit));
+		modesElements.put(Config.MODE_1, new Pair<>(year1Label, year1Edit));
+		modesElements.put(Config.MODE_2, new Pair<>(year2Label, year2Edit));
 		showModeOptions();
 
 		modeBox.getItems().addAll(modesElements.keySet());
-		modeBox.setValue(Config.ONE_VOLUME);
+		modeBox.setValue(Config.MODE_1);
 	}
 
 	/**
