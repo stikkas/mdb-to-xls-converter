@@ -9,16 +9,13 @@ import javafx.stage.Stage;
 import ru.insoft.archive.vkks.converter.control.ConverterController;
 
 /**
- * Другая версия: 1. Если отсутствует значение в поле "Заголовок документа"
- * (Doc_title), то кладем значение из поля "Тип документа" (Doc_type) 2.
- * Необходимо в столбец "Страница №" (файл xls) сохранить значение из поля
- * "Страница с" (Page_s)
+ * Тестовая версия для МИНЮСТА
  *
  * @author Благодатских С.
  */
 public class ConverterUi extends Application {
 
-	private final static String TITLE = "Конвертор ДЕЛ ПОСТОЯННОГО ХРАНЕНИЯ";
+	private final static String TITLE = "Конвертор МИНЮСТ (Проблемы преступности)";
 	private Stage stage;
 
 	@Override
