@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -55,10 +54,6 @@ public class Worker extends Thread {
 	private final BooleanProperty done = new SimpleBooleanProperty(false);
 
 	private final String mode;
-	/**
-	 * Может содержать либо идентификатор дела, либо год, зависит от режима
-	 */
-	private final Integer idOrYear;
 	private final String xlsDir;
 	private final EntityManager em;
 	private final TextArea logPanel;
@@ -66,11 +61,10 @@ public class Worker extends Thread {
 	private static final javax.validation.Validator validator
 			= Validation.buildDefaultValidatorFactory().getValidator();
 
-	public Worker(String accessDb, TextArea logPanel, String mode, Integer idOrYear) {
+	public Worker(String accessDb, TextArea logPanel, String mode) {
 		this.xlsDir = Paths.get(accessDb).getParent().toString();
 		this.logPanel = logPanel;
 		this.mode = mode;
-		this.idOrYear = idOrYear;
 
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
@@ -98,13 +92,11 @@ public class Worker extends Thread {
 	 * Создает файл со сборниками
 	 */
 	private void createYearSbornik() {
-		List<Delo> dela = ((List<Delo>) em.createQuery("SELECT d FROM Delo d WHERE d.title LIKE :title", Delo.class)
+		List<Delo> dela = em.createQuery("SELECT d FROM Delo d WHERE d.title LIKE :title ORDER BY d.startDate ASC, d.tom ASC", Delo.class)
 				.setParameter("title", Config.modeTitles.get(mode))
-				.getResultList()).stream()
-				.filter(d -> d.getStartDate().get(Calendar.YEAR) == idOrYear)
-				.collect(Collectors.toList());
+				.getResultList();
 
-		convertFewDelo(dela, (mode.equals(Config.MODE_1) ? Config.FILE_NAME_1 : Config.FILE_NAME_2) + idOrYear);
+		convertFewDelo(dela, mode.equals(Config.MODE_1) ? Config.FILE_NAME_1 : Config.FILE_NAME_2);
 	}
 
 	/**
@@ -142,7 +134,7 @@ public class Worker extends Thread {
 				updateInfo(ex.getMessage());
 			}
 		} else {
-			updateInfo("Для заданного года - " + idOrYear + " дела не найдены");
+			updateInfo("дела не найдены");
 		}
 		return true;
 	}

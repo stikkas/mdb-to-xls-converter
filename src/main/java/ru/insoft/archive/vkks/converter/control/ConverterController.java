@@ -13,12 +13,10 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.stage.FileChooser;
-import javafx.util.Pair;
 import ru.insoft.archive.vkks.converter.Config;
 import ru.insoft.archive.vkks.converter.ConverterUi;
 import ru.insoft.archive.vkks.converter.Worker;
@@ -60,27 +58,7 @@ public class ConverterController {
 	private Button cancelButton;
 
 	@FXML
-	private NumberField caseIdEdit;
-
-	@FXML
-	private Label caseIdLabel;
-
-	@FXML
-	private NumberField year1Edit;
-
-	@FXML
-	private Label year1Label;
-
-	@FXML
-	private NumberField year2Edit;
-
-	@FXML
-	private Label year2Label;
-
-	@FXML
 	private ComboBox<String> modeBox;
-
-	private final Map<String, Pair<Label, NumberField>> modesElements = new HashMap<>();
 
 	/**
 	 * Запуск конвертации
@@ -95,8 +73,7 @@ public class ConverterController {
 					+ "].\n");
 
 			String mode = modeBox.getValue();
-			Worker w = new Worker(dbFileEdit.getText(), logPanel, mode,
-					modesElements.get(mode).getValue().getValue());
+			Worker w = new Worker(dbFileEdit.getText(), logPanel, mode);
 
 			runningWorkers.put(dbFile, w);
 			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
@@ -191,25 +168,9 @@ public class ConverterController {
 			cancelButton.setDisable(countWorkers.get().get() <= 0);
 		});
 
-		modesElements.put(Config.MODE_1, new Pair<>(year1Label, year1Edit));
-		modesElements.put(Config.MODE_2, new Pair<>(year2Label, year2Edit));
-		showModeOptions();
 
-		modeBox.getItems().addAll(modesElements.keySet());
+		modeBox.getItems().addAll(Config.MODE_1, Config.MODE_2);
 		modeBox.setValue(Config.MODE_1);
-	}
-
-	/**
-	 * Устанавливает взаимодействие между выбором режима и параметрами режима
-	 */
-	private void showModeOptions() {
-		modesElements.keySet().stream().map((key) -> {
-			Pair<Label, NumberField> p = modesElements.get(key);
-			p.getKey().visibleProperty().bind(modeBox.valueProperty().isEqualTo(key));
-			return p;
-		}).forEach((p) -> {
-			p.getValue().visibleProperty().bind(p.getKey().visibleProperty());
-		});
 	}
 
 	public void setApp(ConverterUi app) {

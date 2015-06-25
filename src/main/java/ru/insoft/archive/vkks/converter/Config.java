@@ -21,9 +21,9 @@ public class Config {
 		"Примечание"
 	};
 	
-	public static final String FILE_NAME_1 = "111.1. Проблемы преступности_";
-	public static final String FILE_NAME_2 = "111.2. Проблемы преступности_";
-	private static final String mode_template = "формировать '%s[ГОД].xls'";
+	public static final String FILE_NAME_1 = "111.1. Проблемы преступности";
+	public static final String FILE_NAME_2 = "111.2. Проблемы преступности";
+	private static final String mode_template = "формировать '%s.xls'";
 
 	public static final String MODE_1 = String.format(mode_template, FILE_NAME_1);
 	public static final String MODE_2 = String.format(mode_template, FILE_NAME_2);
