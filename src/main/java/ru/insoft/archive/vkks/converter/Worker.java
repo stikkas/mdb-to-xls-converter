@@ -96,7 +96,7 @@ public class Worker extends Thread {
 				.setParameter("title", Config.modeTitles.get(mode))
 				.getResultList();
 
-		convertFewDelo(dela, mode.equals(Config.MODE_1) ? Config.FILE_NAME_1 : Config.FILE_NAME_2);
+		convertFewDelo(dela);
 	}
 
 	/**
@@ -107,7 +107,7 @@ public class Worker extends Thread {
 	 * @param fileName имя файла для записи данных
 	 * @return в случае сигнала прервать операцию возвращаем false
 	 */
-	private boolean convertFewDelo(List<Delo> dela, String fileName) {
+	private boolean convertFewDelo(List<Delo> dela) {
 
 		Workbook wb = new HSSFWorkbook();
 		Sheet deloSheet = wb.createSheet("Дело");
@@ -129,7 +129,7 @@ public class Worker extends Thread {
 		if (!dela.isEmpty()) {
 			Delo d = dela.get(0);
 			try {
-				writeData(wb, Paths.get(xlsDir, fileName + ".xls"));
+				writeData(wb, Paths.get(xlsDir, mode + ".xls"));
 			} catch (ErrorCreateXlsFile ex) {
 				updateInfo(ex.getMessage());
 			}
@@ -180,7 +180,7 @@ public class Worker extends Thread {
 	 */
 	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo, int rowNumber) {
 		Row row = sheet.createRow(rowNumber);
-		setCellValue(row.createCell(0), Config.modeNumbers.get(mode) + "-"
+		setCellValue(row.createCell(0), "1-1-6"
 				+ delo.getStartDate().get(Calendar.YEAR), ValueType.STRING);
 		setCellValue(row.createCell(1), delo.getTitle(), ValueType.STRING);
 		setCellValue(row.createCell(2), delo.getTom(), ValueType.INTEGER);
@@ -257,7 +257,7 @@ public class Worker extends Thread {
 		row.createCell(8);
 		setCellValue(row.createCell(9), getPdfLink(delo.getGraph())
 				+ ";" + getPdfLink(doc.getGraph()), ValueType.STRING);
-		setCellValue(row.createCell(10), "Ежемесячный информационный бюллетень", ValueType.STRING);
+		setCellValue(row.createCell(10), "Ежемесячный информационный бюллетень ВИНИТИ", ValueType.STRING);
 		row.createCell(11);
 		row.createCell(12);
 		row.createCell(13);

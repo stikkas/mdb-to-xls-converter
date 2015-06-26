@@ -21,15 +21,10 @@ public class Config {
 		"Примечание"
 	};
 	
-	public static final String FILE_NAME_1 = "111.1. Проблемы преступности";
-	public static final String FILE_NAME_2 = "111.2. Проблемы преступности";
-	private static final String mode_template = "формировать '%s.xls'";
-
-	public static final String MODE_1 = String.format(mode_template, FILE_NAME_1);
-	public static final String MODE_2 = String.format(mode_template, FILE_NAME_2);
+	public static final String MODE_1 = "1-1-6 Проблемы преступности (по материалам зарубежной печати)";
+	public static final String MODE_2 = "1-1-6 Проблемы преступности (по материалам иностранной печати)";
 
 	public static final Map<String, String> modeTitles = new HashMap<>();
-	public static final Map<String, String> modeNumbers = new HashMap<>();
 
 	public static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 	public static final String[] docHeaders = {
@@ -58,9 +53,6 @@ public class Config {
 		instance = new Config();
 		modeTitles.put(MODE_1, "%Проблемы преступности в капиталистических странах (по материалам зарубежной печати)%");
 		modeTitles.put(MODE_2, "%Проблемы преступности в капиталистических странах (по материалам иностранной печати)%");
-		
-		modeNumbers.put(MODE_1, "111.1");
-		modeNumbers.put(MODE_2, "111.2");
 	}
 
 	private static final Config instance;
