@@ -25,6 +25,8 @@ public class Delo implements Serializable {
 
 	private Integer id;
 
+	private Integer barCode;
+
 	private String title;
 
 	private Calendar startDate;
@@ -48,6 +50,15 @@ public class Delo implements Serializable {
 
 	public void setId(Integer id) {
 		this.id = id;
+	}
+
+	@Column(name = "Case_barcod", insertable = false, updatable = false)
+	public Integer getBarCode() {
+		return barCode;
+	}
+
+	public void setBarCode(Integer barCode){
+		this.barCode = barCode;
 	}
 
 	@NotNull(message = "начальная дата дела отсутствует")
@@ -82,9 +93,10 @@ public class Delo implements Serializable {
 		this.title = title;
 	}
 
-	@NotNull(message = "номер тома отсутствует")
 	@Column(name = "Number_tom", insertable = false, updatable = false)
 	public Integer getTom() {
+		if (tom == null)
+			return 1;
 		return tom;
 	}
 

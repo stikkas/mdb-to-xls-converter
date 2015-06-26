@@ -169,7 +169,7 @@ public class ConverterController {
 		});
 
 
-		modeBox.getItems().addAll(Config.MODE_1, Config.MODE_2);
+		modeBox.getItems().addAll(Config.MODE_1, Config.MODE_2, Config.MODE_3);
 		modeBox.setValue(Config.MODE_1);
 	}
 
