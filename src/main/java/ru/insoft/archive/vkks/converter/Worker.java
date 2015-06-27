@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Calendar;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -18,7 +17,6 @@ import javax.persistence.Persistence;
 import javax.validation.Validation;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -27,8 +25,6 @@ import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.error.ErrorCreateXlsFile;
 import ru.insoft.archive.vkks.converter.error.WrongModeException;
-import org.apache.commons.io.FilenameUtils;
-import com.itextpdf.text.pdf.PdfReader;
 import javafx.application.Platform;
 import javax.validation.ConstraintViolation;
 import org.apache.poi.ss.usermodel.Cell;
@@ -36,6 +32,7 @@ import org.apache.poi.ss.usermodel.Font;
 import ru.insoft.archive.vkks.converter.buillders.QueryBuilder;
 import ru.insoft.archive.vkks.converter.buillders.XLSEntityBuilder;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
+import ru.insoft.archive.vkks.converter.dto.XLSDocument;
 import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
 
 /**
@@ -52,8 +49,6 @@ public class Worker extends Thread {
 	}
 
 	private boolean commit = false;
-
-	private final Set<String> createdFileNames = new HashSet<>();
 
 	/**
 	 * Сигнализирует о завершении работы
@@ -80,7 +75,7 @@ public class Worker extends Thread {
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
 		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
-		entityBuilder = new XLSEntityBuilder(mode);
+		entityBuilder = new XLSEntityBuilder(mode, xlsPathDir);
 	}
 
 	/**
@@ -135,7 +130,6 @@ public class Worker extends Thread {
 		}
 
 		if (!dela.isEmpty()) {
-			Delo d = dela.get(0);
 			try {
 				writeData(wb, Paths.get(xlsDir, mode + ".xls"));
 			} catch (ErrorCreateXlsFile ex) {
@@ -152,24 +146,14 @@ public class Worker extends Thread {
 	 */
 	private void createDelo(Delo d, Sheet delaSheet, Workbook wb, int deloRowNumber,
 			boolean createHeaders) throws WrongModeException, WrongPdfFile {
-
 		if (createHeaders) {
 			setHeaders(Config.deloHeaders, wb, delaSheet);
 		}
 
-		fillDeloSheet(wb, delaSheet, d, deloRowNumber);
-
-		CellStyle dateStyle = wb.createCellStyle();
-		DataFormat df = wb.createDataFormat();
-		dateStyle.setDataFormat(df.getFormat("m/d/yy"));
-
+		fillDeloSheet(delaSheet, entityBuilder.createXLSDelo(d), deloRowNumber);
 		Sheet sheet = wb.createSheet("Документы" + deloRowNumber);
 
-		int docRowNumber = 1;
-
-		// Разбираем документы на просто документы и на листы-заверители и внутренние описи
-		fillDocsSheet(wb, sheet, docRowNumber, d, dateStyle, true);
-
+		fillDocsSheet(wb, sheet, 1, d, true);
 	}
 
 	/**
@@ -186,15 +170,14 @@ public class Worker extends Thread {
 	/**
 	 * Добавляет запись на лист "Дело"
 	 */
-	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo, int rowNumber) throws WrongModeException {
-		XLSDelo xlsDelo = entityBuilder.createXLSDelo(delo);
+	private void fillDeloSheet(Sheet sheet, XLSDelo delo, int rowNumber) throws WrongModeException {
 		Row row = sheet.createRow(rowNumber);
-		setCellValue(row.createCell(0), xlsDelo.getIndex(), ValueType.STRING);
-		setCellValue(row.createCell(1), xlsDelo.getTitle(), ValueType.STRING);
-		setCellValue(row.createCell(2), xlsDelo.getTomNumber(), ValueType.INTEGER);
+		setCellValue(row.createCell(0), delo.getIndex(), ValueType.STRING);
+		setCellValue(row.createCell(1), delo.getTitle(), ValueType.STRING);
+		setCellValue(row.createCell(2), delo.getTomNumber(), ValueType.INTEGER);
 		row.createCell(3);
-		setCellValue(row.createCell(4), xlsDelo.getStartDate(), ValueType.CALENDAR);
-		setCellValue(row.createCell(5), xlsDelo.getEndDate(), ValueType.CALENDAR);
+		setCellValue(row.createCell(4), delo.getStartDate(), ValueType.CALENDAR);
+		setCellValue(row.createCell(5), delo.getEndDate(), ValueType.CALENDAR);
 		row.createCell(6);
 	}
 
@@ -202,152 +185,24 @@ public class Worker extends Thread {
 	 * Заполняет страницу документов
 	 */
 	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, Delo delo,
-			CellStyle dateStyle, boolean createHeaders) throws WrongPdfFile, WrongModeException {
+			boolean createHeaders) throws WrongPdfFile, WrongModeException {
 		if (createHeaders) {
 			setHeaders(Config.docHeaders, wb, sheet);
 		}
 
-		String deloGraph = delo.getGraph();
-		if (deloGraph != null && !deloGraph.trim().isEmpty()) {
-			/*
-			 № регистрации = "б/н"
-			 Дата регистрации = \Delo\Date_end
-			 Краткое содержание = \Delo\Delo_title
-			 Количество листов = считать количество страниц в прикрепленном PDF-файле
-			 Файлы = \Delo\Graph_delo
-			 Примечание = is Null
-			 Наименование вида = "Титульный лист"
+		if (!(mode == ConvertMode.CRIME_ZARUB || mode == ConvertMode.CRIME_INOSTR 
+				|| mode == ConvertMode.INSTRUCTIONS || mode == ConvertMode.ORDERS)) {
+			String deloGraph = delo.getGraph();
+			if (deloGraph != null && !deloGraph.trim().isEmpty()) {
+				createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createTiltePageDelo(delo));
+			}
 
-			 № регистрации = "б/н"
-			 Дата регистрации = \Delo\Date_end
-			 Краткое содержание = \Delo\Delo_title
-			 Количество листов = считать количество страниц в прикрепленном PDF-файле
-			 Файлы = \Delo\Graph_delo
-			 Примечание = is Null
-			 Наименование вида = "Титульный лист"
-
-			 № регистрации = "б/н"
-			 Дата регистрации = 31.12.1998
-			 Краткое содержание = \Delo\Delo_title
-			 Количество листов = считать количество страниц в прикрепленном PDF-файле
-			 Файлы = \Delo\Graph_delo
-			 Примечание = is Null
-			 Наименование вида = "Титульный лист"
-			 */
-			Calendar date = null;
-			/*
-			 if (mode.equals(Config.MODE_3)) {
-			 date = Calendar.getInstance();
-			 date.set(1998, 11, 31);
-			 } else {
-			 date = delo.getEndDate();
-			 }
-			 */
-			String pdfFileName = getPdfLink(delo.getGraph());
-			createDocRecord(sheet.createRow(rowNumber++), new Document("б/н",
-					date, delo.getTitle(), countPages(pdfFileName), pdfFileName,
-					"", "Титульный лист"));
+			for (Document doc : delo.getDocuments()) {
+				createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createXLSDocument(delo, doc));
+				++stat.docs;
+			}
 		}
-
-		List<Document> documents = delo.getDocuments();
-		int size = documents.size();
-		/*
-		 for (int i = 0; i < size; ++i) {
-		 Document doc = documents.get(i);
-		 № регистрации = \Document\Report_form_number, если \Document\Report_form_number = is Null, то \Document\Report_form_number = "б/н"
-		 Дата регистрации = \Document\Date_doc, если \Document\Date_doc= is Null, то \Document\Date_doc = \Delo\Date_end
-		 Краткое содержание = \Document\Doc_title
-		 Количество листов = считать количество страниц в прикрепленном PDF-файле
-		 Файлы = \Document\Graph
-		 Примечание = "\Document\Law_court_name"+" 
-		 \Document\Subject_name_RF" " \Document\Report_period"
-		 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
-		 Наименование вида = "Регламентная судебная статистика"
-
-		 № регистрации = «МЮ-б\н»"
-		 Дата регистрации = \Delo\Date_end
-		 Краткое содержание = \Document\Doc_title
-		 Количество листов = считать количество страниц в прикрепленном PDF-файле
-		 Файлы = \Document\Graph
-		 Примечание = "\Document\Law_court_name"+
-		 " \Document\Subject_name_RF" " \Document\Report_period"
-		 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
-		 Наименование вида = "судебная статистика"
-
-		 № регистрации = «МЮ-б\н»"
-		 Дата регистрации = 31.12.1998
-		 Краткое содержание = \Document\Doc_title
-		 Количество листов = считать количество страниц в прикрепленном PDF-файле
-		 Файлы = \Document\Graph
-		 Наименование вида = "обзоры_доклады" 
-		 */
-		/*
-		 String regNumber;
-		 Calendar date;
-		 String remark;
-		 String type; 
-		 if (mode.equals(Config.MODE_1)) {
-		 } else {
-		 }
-		 switch (mode) {
-		 case Config.MODE_1:
-		 regNumber = doc.getReportFormNumber();
-		 date = doc.getDate();
-		 if (date == null) {
-		 date = delo.getEndDate();
-		 }
-		 type = "Регламентная судебная статистика";
-		 remark = doc.getLawCourtName() + doc.getSubjectNameRF() + doc.getReportPeriod() + doc.getReportType();
-		 break;
-		 case Config.MODE_2:
-		 regNumber = "МЮ-б\\н";
-		 date = delo.getEndDate();
-		 type = "судебная статистика";
-		 remark = doc.getLawCourtName() + doc.getSubjectNameRF() + doc.getReportPeriod() + doc.getReportType();
-		 break;
-		 case Config.MODE_3:
-		 regNumber = "МЮ-б\\н";
-		 date = Calendar.getInstance();
-		 date.set(1998, 11, 31);
-		 type = "обзоры_доклады";
-		 remark = "";
-		 break;
-		 default:
-		 throw new WrongModeException("Неправильный режим работы: " + mode);
-		 }
-		 String docGraph = getPdfLink(doc.getGraph());
-
-		 createDocRecord(sheet.createRow(rowNumber++), new Document(regNumber,
-		 date, doc.getTitle(), countPages(docGraph), docGraph, remark, type));
-		 ++stat.docs;
-		 }
-		 */
 		return rowNumber;
-	}
-
-	/**
-	 * Подситываем кол-во страниц документов на входе получает относительный
-	 * путь к файлу в формате Windows
-	 */
-	private String countPages(String pdfFileName) throws WrongPdfFile {
-		try {
-			pdfFileName = FilenameUtils.separatorsToSystem(pdfFileName);
-			PdfReader reader = new PdfReader(xlsPathDir.resolve(pdfFileName).toString());
-			Integer pages = reader.getNumberOfPages();
-			reader.close();
-			return pages.toString();
-		} catch (IOException ex) {
-			throw new WrongPdfFile("Невозможно получить кол-во страниц " + pdfFileName + ": " + ex.getMessage());
-		}
-	}
-
-	/**
-	 * Устанавливает значение для ячейки, если значение null - то ничего не
-	 * делает.
-	 */
-	private void setCellValue(Cell cell, Object value, ValueType type, CellStyle style) {
-		cell.setCellStyle(style);
-		setCellValue(cell, value, type);
 	}
 
 	/**
@@ -374,20 +229,18 @@ public class Worker extends Thread {
 	/**
 	 * Создает запись для документа
 	 */
-	private void createDocRecord(Row row, Document doc) {
-		setCellValue(row.createCell(0), doc.getReportFormNumber(), ValueType.STRING);
-		setCellValue(row.createCell(1), doc.getDate(), ValueType.CALENDAR);
+	private void createDocRecord(Row row, XLSDocument doc) {
+		setCellValue(row.createCell(0), doc.getRegNumber(), ValueType.STRING);
+		setCellValue(row.createCell(1), doc.getRegDate(), ValueType.CALENDAR);
 		row.createCell(2);
 		row.createCell(3);
-		row.createCell(4).setCellValue(doc.getTitle());
+		row.createCell(4).setCellValue(doc.getShortContent());
 		row.createCell(5);
 		row.createCell(6);
-
-		setCellValue(row.createCell(7), doc.getPages(), ValueType.STRING);
-
+		setCellValue(row.createCell(7), doc.getPages(), ValueType.INTEGER);
 		setCellValue(row.createCell(8), doc.getRemark(), ValueType.STRING);
-		setCellValue(row.createCell(9), doc.getGraph(), ValueType.STRING);
-		setCellValue(row.createCell(10), doc.getType(), ValueType.STRING);
+		setCellValue(row.createCell(9), doc.getFiles(), ValueType.STRING);
+		setCellValue(row.createCell(10), doc.getVidName(), ValueType.STRING);
 		row.createCell(11);
 		row.createCell(12);
 		row.createCell(13);
@@ -416,26 +269,6 @@ public class Worker extends Thread {
 		}
 	}
 
-	/**
-	 * Преобразует ссылку из базы данных в относительный путь к исходному файлу.
-	 * В базе данных ссылка представлена в Windows формате. Удаляются лишние
-	 * символы на начале и конце.
-	 *
-	 * @param link ссылка на файл данных
-	 * @return путь к файлу в Windows формате
-	 */
-	private String getPdfLink(String link) {
-		if (link != null) {
-			link = link.trim();
-			if (link.startsWith("#")) {
-				link = link.substring(1);
-			}
-			if (link.endsWith("#")) {
-				link = link.substring(0, link.length() - 1);
-			}
-		}
-		return link;
-	}
 
 	/**
 	 * Пишет информацию о ходе выполнения в статустую панель.

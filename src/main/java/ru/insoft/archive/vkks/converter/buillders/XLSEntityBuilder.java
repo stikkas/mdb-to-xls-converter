@@ -1,13 +1,20 @@
 package ru.insoft.archive.vkks.converter.buillders;
 
+import com.itextpdf.text.pdf.PdfReader;
+import com.sun.org.apache.xerces.internal.util.DOMUtil;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.io.FilenameUtils;
 import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
+import ru.insoft.archive.vkks.converter.error.WrongModeException;
+import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
 
 /**
  * Создает XLSDelo или XLSDocument для определенного режима работы конвертора
@@ -51,13 +58,93 @@ public class XLSEntityBuilder {
 	 */
 	private final Map<DeloKey, Integer> tomNumbers = new HashMap<>();
 	private final ConvertMode mode;
+	private final Path workDir;
 
-	public XLSEntityBuilder(ConvertMode mode) {
+	public XLSEntityBuilder(ConvertMode mode, Path workDir) {
 		this.mode = mode;
+		this.workDir = workDir;
 	}
 
-	public XLSDocument createXLSDocument(Delo delo, Document doc) {
+	/*
+	 № регистрации = \Document\Report_form_number, если \Document\Report_form_number = is Null, то \Document\Report_form_number = "б/н"
+	 Дата регистрации = \Document\Date_doc, если \Document\Date_doc= is Null, то \Document\Date_doc = \Delo\Date_end
+	 Краткое содержание = \Document\Doc_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Document\Graph
+	 Примечание = "\Document\Law_court_name"+" 
+	 \Document\Subject_name_RF" " \Document\Report_period"
+	 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
+	 Наименование вида = "Регламентная судебная статистика"
+
+	 № регистрации = «МЮ-б\н»"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = \Document\Doc_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Document\Graph
+	 Примечание = "\Document\Law_court_name"+
+	 " \Document\Subject_name_RF" " \Document\Report_period"
+	 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
+	 Наименование вида = "судебная статистика"
+
+	 № регистрации = «МЮ-б\н»"
+	 Дата регистрации = 31.12.1998
+	 Краткое содержание = \Document\Doc_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Document\Graph
+	 Наименование вида = "обзоры_доклады" 
+
+	 */
+	public XLSDocument createXLSDocument(Delo delo, Document doc) throws WrongPdfFile {
+		switch (mode) {
+			case CRIME_ZARUB:
+			case CRIME_INOSTR:
+				return getDocument(delo, doc, "Ежемесячный информационный бюллетень",
+						"Ежемесячный информационный бюллетень ВИНИТИ");
+			case LAW_STAT:
+				return getDocument(doc, delo, "Регламентная судебная статистика");
+			case METRIC_STAT_BIN:
+				return getDocument("МЮ-б\\н", delo, doc, "судебная статистика");
+			case REVIEW_REPORT:
+				return getDocument("МЮ-б\\н", doc, 1998, 11, 31, "обзоры_доклады");
+		}
 		return null;
+	}
+
+	private XLSDocument getDocument(Delo delo, Document doc, String shortContent, String vidName) {
+		Integer tom = delo.getTom();
+		Calendar cal = Calendar.getInstance();
+		cal.set(delo.getStartDate().get(Calendar.YEAR), tom - 1, 1);
+		return new XLSDocument(tom.toString(), cal, shortContent,
+				1, getPdfLink(delo.getGraph()) + ";" + getPdfLink(doc.getGraph()), vidName);
+	}
+
+	private XLSDocument getDocument(String regNumber, Document doc, int year,
+			int month, int day, String vidName) throws WrongPdfFile {
+		Calendar cal = Calendar.getInstance();
+		cal.set(year, month, day);
+		String pdfLink = getPdfLink(doc.getGraph());
+		return new XLSDocument(regNumber, cal, doc.getTitle(), countPages(pdfLink),
+				pdfLink, vidName);
+	}
+
+	private XLSDocument getDocument(String regNumber, Delo delo, Document doc, String vidName) throws WrongPdfFile {
+		String pdfLink = getPdfLink(doc.getGraph());
+		return new XLSDocument(regNumber, delo.getEndDate(), doc.getTitle(),
+				countPages(pdfLink), pdfLink, doc.getLawCourtName()
+				+ doc.getSubjectNameRF() + doc.getReportPeriod()
+				+ doc.getReportType(), vidName);
+	}
+
+	private XLSDocument getDocument(Document doc, Delo delo, String vidName) throws WrongPdfFile {
+		Calendar date = doc.getDate();
+		if (date == null) {
+			date = delo.getEndDate();
+		}
+		String pdfLink = getPdfLink(doc.getGraph());
+		return new XLSDocument(doc.getReportFormNumber(), date, doc.getTitle(),
+				countPages(pdfLink), pdfLink, doc.getLawCourtName()
+				+ doc.getSubjectNameRF() + doc.getReportPeriod()
+				+ doc.getReportType(), vidName);
 	}
 	/*
 	 Индекс дела = «1-4" + «значение года из \Delo\Date_end»
@@ -138,6 +225,95 @@ public class XLSEntityBuilder {
 			default:// PUBLICATIONS:
 				return getDelo("1-3 Правовая информатика", delo, 1, "Правовая информатика");
 		}
+	}
+
+	/**
+	 * Создает титульный лист для дела. В режимах CRIME_ZARUB, INSTRUCTIONS,
+	 * ORDERS и CRIME_INOSTR не используется
+	 *
+	 * @param delo дело из mdb
+	 * @return данные для размещения в xls файле на странице "Документы"
+	 * @throws ru.insoft.archive.vkks.converter.error.WrongModeException
+	 * @throws ru.insoft.archive.vkks.converter.error.WrongPdfFile
+	 */
+	/*
+	 № регистрации = "б/н"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = \Delo\Delo_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Delo\Graph_delo
+	 Примечание = is Null
+	 Наименование вида = "Титульный лист"
+
+	 № регистрации = "б/н"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = \Delo\Delo_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Delo\Graph_delo
+	 Примечание = is Null
+	 Наименование вида = "Титульный лист"
+
+	 № регистрации = "б/н"
+	 Дата регистрации = 31.12.1998
+	 Краткое содержание = \Delo\Delo_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Delo\Graph_delo
+	 Примечание = is Null
+	 Наименование вида = "Титульный лист"
+	 ========================================================
+	 № регистрации = "б/н"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = "Титульный лист"
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Delo\Graph_delo
+	 Наименование вида = "Титульный лист"
+	
+	 № регистрации = "б/н"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = «Титульный лист»
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Delo\Graph_delo
+	 Наименование вида = "Титульный лист"
+
+	
+	 */
+	public XLSDocument createTiltePageDelo(Delo delo) throws WrongModeException, WrongPdfFile {
+		switch (mode) {
+			case LAW_STAT:
+			case METRIC_STAT_BIN:
+				return getTitlePage(delo);
+			case REVIEW_REPORT:
+				return getTiltePage(delo, 1998, 11, 31);
+			case CRIME_STATUS_RU:
+			case CRIME_AND_DELICT:
+				return getTitlePage(delo, "Титульный лист", "Титульный лист");
+			case PUBLICATIONS:
+				return null;
+			default:
+				throw new WrongModeException("Для режима '" + mode + "' не определено создание титульного листа");
+		}
+	}
+
+	private XLSDocument getTitlePage(Delo delo, String shortContent,
+			String vidName) throws WrongPdfFile {
+		String pdfLink = getPdfLink(delo.getGraph());
+		return new XLSDocument("б/н", delo.getEndDate(), shortContent,
+				countPages(pdfLink), pdfLink, vidName);
+
+	}
+
+	private XLSDocument getTitlePage(Delo delo) throws WrongPdfFile {
+		String pdfLink = getPdfLink(delo.getGraph());
+		return new XLSDocument("б/н", delo.getEndDate(), delo.getTitle(),
+				countPages(pdfLink), pdfLink, "Титульный лист");
+	}
+
+	private XLSDocument getTiltePage(Delo delo, int regYear, int regMonth, int regDate) throws WrongPdfFile {
+		String pdfLink = getPdfLink(delo.getGraph());
+		Calendar cal = Calendar.getInstance();
+		cal.set(regYear, regMonth, regDate);
+		return new XLSDocument("б/н", cal, delo.getTitle(),
+				countPages(pdfLink), pdfLink, "Титульный лист");
 	}
 
 	/**
@@ -255,5 +431,42 @@ public class XLSEntityBuilder {
 			tom = 1;
 		}
 		return tom;
+	}
+
+	/**
+	 * Подситываем кол-во страниц документов на входе получает относительный
+	 * путь к файлу в формате Windows
+	 */
+	private int countPages(String pdfFileName) throws WrongPdfFile {
+		try {
+			pdfFileName = FilenameUtils.separatorsToSystem(pdfFileName);
+			PdfReader reader = new PdfReader(workDir.resolve(pdfFileName).toString());
+			int pages = reader.getNumberOfPages();
+			reader.close();
+			return pages;
+		} catch (IOException ex) {
+			throw new WrongPdfFile("Невозможно получить кол-во страниц " + pdfFileName + ": " + ex.getMessage());
+		}
+	}
+
+	/**
+	 * Преобразует ссылку из базы данных в относительный путь к исходному файлу.
+	 * В базе данных ссылка представлена в Windows формате. Удаляются лишние
+	 * символы на начале и конце.
+	 *
+	 * @param link ссылка на файл данных
+	 * @return путь к файлу в Windows формате
+	 */
+	private String getPdfLink(String link) {
+		if (link != null) {
+			link = link.trim();
+			if (link.startsWith("#")) {
+				link = link.substring(1);
+			}
+			if (link.endsWith("#")) {
+				link = link.substring(0, link.length() - 1);
+			}
+		}
+		return link;
 	}
 }
