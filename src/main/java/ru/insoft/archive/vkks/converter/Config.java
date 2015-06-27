@@ -1,10 +1,6 @@
 package ru.insoft.archive.vkks.converter;
 
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Общий настройечный класс для всего приложения.

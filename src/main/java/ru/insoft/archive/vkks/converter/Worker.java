@@ -35,6 +35,7 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Font;
 import ru.insoft.archive.vkks.converter.buillders.QueryBuilder;
 import ru.insoft.archive.vkks.converter.buillders.XLSEntityBuilder;
+import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
 
 /**
@@ -109,7 +110,7 @@ public class Worker extends Thread {
 	 * @param fileName имя файла для записи данных
 	 * @return в случае сигнала прервать операцию возвращаем false
 	 */
-	private boolean convertFewDelo(List<Delo> dela) throws WrongModeException {
+	private void convertFewDelo(List<Delo> dela) throws WrongModeException {
 
 		Workbook wb = new HSSFWorkbook();
 		Sheet deloSheet = wb.createSheet("Дело");
@@ -117,7 +118,7 @@ public class Worker extends Thread {
 		int rowNumber = 1;
 		for (Delo d : dela) {
 			if (commit) {
-				return false;
+				return;
 			}
 			++stat.cases;
 			if (checkDelo(d)) {
@@ -143,20 +144,20 @@ public class Worker extends Thread {
 		} else {
 			updateInfo("дела не найдены");
 		}
-		return true;
 	}
 
 	/**
 	 * Создает запись о деле в листе Дело, и записи документов дела в листе
 	 * Документы
 	 */
-	private void createDelo(Delo d, Sheet dela, Workbook wb, int deloRowNumber, boolean createHeaders) throws WrongModeException, WrongPdfFile {
+	private void createDelo(Delo d, Sheet delaSheet, Workbook wb, int deloRowNumber,
+			boolean createHeaders) throws WrongModeException, WrongPdfFile {
 
 		if (createHeaders) {
-			setHeaders(Config.deloHeaders, wb, dela);
+			setHeaders(Config.deloHeaders, wb, delaSheet);
 		}
 
-		fillDeloSheet(wb, dela, d, deloRowNumber);
+		fillDeloSheet(wb, delaSheet, d, deloRowNumber);
 
 		CellStyle dateStyle = wb.createCellStyle();
 		DataFormat df = wb.createDataFormat();
@@ -183,65 +184,18 @@ public class Worker extends Thread {
 	}
 
 	/**
-	 * Заполняет страницу дел
+	 * Добавляет запись на лист "Дело"
 	 */
 	private void fillDeloSheet(Workbook wb, Sheet sheet, Delo delo, int rowNumber) throws WrongModeException {
-		/*
-		 Индекс дела = «1-4" + «значение года из \Delo\Date_end»
-		 Заголовок дела = \Delo\Delo_title
-		 № тома = \Delo\Number_tom, если \Delo\Number_tom = is Null, то \Delo\Number_tom = 1
-		 Дата дела с = \Delo\Date_start
-		 Дата дела по = \Delo\Date_end
-
-		 Индекс дела = «1-1-5» + «-значение года из \Delo\Date_end»
-		 Заголовок дела = \Delo\Delo_title
-		 № тома = \Delo\Number_tom, если \Delo\Number_tom = is Null, то \Delo\Number_tom = 1
-		 Дата дела с = \Delo\Date_start
-		 Дата дела по = \Delo\Date_end
-
-		 Индекс дела = «1-1-1» + «-1998»
-		 Заголовок дела = \Delo\Delo_title
-		 № тома = \Delo\Number_tom, если \Delo\Number_tom = is Null, то \Delo\Number_tom = 1
-		 Дата дела с = 01.01.1998
-		 Дата дела по = 31.12.1998
-		 */
-
-		String caseIndex;
-		Calendar startDate;
-		Calendar endDate;
-
-		/*
-		 switch (mode) {
-		 case Config.MODE_1:
-		 endDate = delo.getEndDate();
-		 startDate = delo.getStartDate();
-		 caseIndex = "1-4" + endDate.get(Calendar.YEAR);
-		 break;
-		 case Config.MODE_2:
-		 endDate = delo.getEndDate();
-		 startDate = delo.getStartDate();
-		 caseIndex = "1-1-5-" + endDate.get(Calendar.YEAR);
-		 break;
-		 case Config.MODE_3:
-		 startDate = Calendar.getInstance();
-		 startDate.set(1998, 0, 1);
-		 endDate = Calendar.getInstance();
-		 endDate.set(1998, 11, 31);
-		 caseIndex = "1-1-1-1998";
-		 break;
-		 default:
-		 throw new WrongModeException("Неправильный режим работы: " + mode);
-		 }
-
-		 Row row = sheet.createRow(rowNumber);
-		 setCellValue(row.createCell(0), caseIndex, ValueType.STRING);
-		 setCellValue(row.createCell(1), delo.getTitle(), ValueType.STRING);
-		 setCellValue(row.createCell(2), delo.getTom(), ValueType.INTEGER);
-		 row.createCell(3);
-		 setCellValue(row.createCell(4), startDate, ValueType.CALENDAR);
-		 setCellValue(row.createCell(5), endDate, ValueType.CALENDAR);
-		 row.createCell(6);
-		 */
+		XLSDelo xlsDelo = entityBuilder.createXLSDelo(delo);
+		Row row = sheet.createRow(rowNumber);
+		setCellValue(row.createCell(0), xlsDelo.getIndex(), ValueType.STRING);
+		setCellValue(row.createCell(1), xlsDelo.getTitle(), ValueType.STRING);
+		setCellValue(row.createCell(2), xlsDelo.getTomNumber(), ValueType.INTEGER);
+		row.createCell(3);
+		setCellValue(row.createCell(4), xlsDelo.getStartDate(), ValueType.CALENDAR);
+		setCellValue(row.createCell(5), xlsDelo.getEndDate(), ValueType.CALENDAR);
+		row.createCell(6);
 	}
 
 	/**

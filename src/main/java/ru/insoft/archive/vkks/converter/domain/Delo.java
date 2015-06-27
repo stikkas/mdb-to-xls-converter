@@ -95,8 +95,6 @@ public class Delo implements Serializable {
 
 	@Column(name = "Number_tom", insertable = false, updatable = false)
 	public Integer getTom() {
-		if (tom == null)
-			return 1;
 		return tom;
 	}
 
