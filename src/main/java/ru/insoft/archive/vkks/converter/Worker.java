@@ -33,6 +33,8 @@ import javafx.application.Platform;
 import javax.validation.ConstraintViolation;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Font;
+import ru.insoft.archive.vkks.converter.buillders.QueryBuilder;
+import ru.insoft.archive.vkks.converter.buillders.XLSEntityBuilder;
 import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
 
 /**
@@ -57,7 +59,7 @@ public class Worker extends Thread {
 	 */
 	private final BooleanProperty done = new SimpleBooleanProperty(false);
 
-	private final String mode;
+	private final ConvertMode mode;
 	private final String xlsDir;
 	private final Path xlsPathDir;
 	private final EntityManager em;
@@ -66,7 +68,9 @@ public class Worker extends Thread {
 	private static final javax.validation.Validator validator
 			= Validation.buildDefaultValidatorFactory().getValidator();
 
-	public Worker(String accessDb, TextArea logPanel, String mode) {
+	private final XLSEntityBuilder entityBuilder;
+
+	public Worker(String accessDb, TextArea logPanel, ConvertMode mode) {
 		this.xlsPathDir = Paths.get(accessDb).getParent();
 		this.xlsDir = xlsPathDir.toString();
 		this.logPanel = logPanel;
@@ -75,6 +79,7 @@ public class Worker extends Thread {
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
 		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
+		entityBuilder = new XLSEntityBuilder(mode);
 	}
 
 	/**
@@ -87,23 +92,13 @@ public class Worker extends Thread {
 	@Override
 	public void run() {
 		try {
-			createYearSbornik();
+			convertFewDelo(new QueryBuilder(em, mode).createQuery().getResultList());
 		} catch (WrongModeException ex) {
 			updateInfo(ex.getMessage());
 		} finally {
 			updateInfo(stat.toString());
 			done.set(true);
 		}
-	}
-
-	/**
-	 * Создает файл со сборниками
-	 */
-	private void createYearSbornik() throws WrongModeException {
-		List<Delo> dela = em.createQuery("SELECT d FROM Delo d WHERE d.barCode in :codes", Delo.class)
-				.setParameter("codes", Config.modeBarCodes.get(mode))
-				.getResultList();
-		convertFewDelo(dela);
 	}
 
 	/**
@@ -215,36 +210,38 @@ public class Worker extends Thread {
 		Calendar startDate;
 		Calendar endDate;
 
-		switch (mode) {
-			case Config.MODE_1:
-				endDate = delo.getEndDate();
-				startDate = delo.getStartDate();
-				caseIndex = "1-4" + endDate.get(Calendar.YEAR);
-				break;
-			case Config.MODE_2:
-				endDate = delo.getEndDate();
-				startDate = delo.getStartDate();
-				caseIndex = "1-1-5-" + endDate.get(Calendar.YEAR);
-				break;
-			case Config.MODE_3:
-				startDate = Calendar.getInstance();
-				startDate.set(1998, 0, 1);
-				endDate = Calendar.getInstance();
-				endDate.set(1998, 11, 31);
-				caseIndex = "1-1-1-1998";
-				break;
-			default:
-				throw new WrongModeException("Неправильный режим работы: " + mode);
-		}
+		/*
+		 switch (mode) {
+		 case Config.MODE_1:
+		 endDate = delo.getEndDate();
+		 startDate = delo.getStartDate();
+		 caseIndex = "1-4" + endDate.get(Calendar.YEAR);
+		 break;
+		 case Config.MODE_2:
+		 endDate = delo.getEndDate();
+		 startDate = delo.getStartDate();
+		 caseIndex = "1-1-5-" + endDate.get(Calendar.YEAR);
+		 break;
+		 case Config.MODE_3:
+		 startDate = Calendar.getInstance();
+		 startDate.set(1998, 0, 1);
+		 endDate = Calendar.getInstance();
+		 endDate.set(1998, 11, 31);
+		 caseIndex = "1-1-1-1998";
+		 break;
+		 default:
+		 throw new WrongModeException("Неправильный режим работы: " + mode);
+		 }
 
-		Row row = sheet.createRow(rowNumber);
-		setCellValue(row.createCell(0), caseIndex, ValueType.STRING);
-		setCellValue(row.createCell(1), delo.getTitle(), ValueType.STRING);
-		setCellValue(row.createCell(2), delo.getTom(), ValueType.INTEGER);
-		row.createCell(3);
-		setCellValue(row.createCell(4), startDate, ValueType.CALENDAR);
-		setCellValue(row.createCell(5), endDate, ValueType.CALENDAR);
-		row.createCell(6);
+		 Row row = sheet.createRow(rowNumber);
+		 setCellValue(row.createCell(0), caseIndex, ValueType.STRING);
+		 setCellValue(row.createCell(1), delo.getTitle(), ValueType.STRING);
+		 setCellValue(row.createCell(2), delo.getTom(), ValueType.INTEGER);
+		 row.createCell(3);
+		 setCellValue(row.createCell(4), startDate, ValueType.CALENDAR);
+		 setCellValue(row.createCell(5), endDate, ValueType.CALENDAR);
+		 row.createCell(6);
+		 */
 	}
 
 	/**
@@ -283,13 +280,15 @@ public class Worker extends Thread {
 			 Примечание = is Null
 			 Наименование вида = "Титульный лист"
 			 */
-			Calendar date;
-			if (mode.equals(Config.MODE_3)) {
-				date = Calendar.getInstance();
-				date.set(1998, 11, 31);
-			} else {
-				date = delo.getEndDate();
-			}
+			Calendar date = null;
+			/*
+			 if (mode.equals(Config.MODE_3)) {
+			 date = Calendar.getInstance();
+			 date.set(1998, 11, 31);
+			 } else {
+			 date = delo.getEndDate();
+			 }
+			 */
 			String pdfFileName = getPdfLink(delo.getGraph());
 			createDocRecord(sheet.createRow(rowNumber++), new Document("б/н",
 					date, delo.getTitle(), countPages(pdfFileName), pdfFileName,
@@ -298,75 +297,77 @@ public class Worker extends Thread {
 
 		List<Document> documents = delo.getDocuments();
 		int size = documents.size();
-		for (int i = 0; i < size; ++i) {
-			Document doc = documents.get(i);
-			/*
-			 № регистрации = \Document\Report_form_number, если \Document\Report_form_number = is Null, то \Document\Report_form_number = "б/н"
-			 Дата регистрации = \Document\Date_doc, если \Document\Date_doc= is Null, то \Document\Date_doc = \Delo\Date_end
-			 Краткое содержание = \Document\Doc_title
-			 Количество листов = считать количество страниц в прикрепленном PDF-файле
-			 Файлы = \Document\Graph
-			 Примечание = "\Document\Law_court_name"+" 
-			 \Document\Subject_name_RF" " \Document\Report_period"
-			 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
-			 Наименование вида = "Регламентная судебная статистика"
+		/*
+		 for (int i = 0; i < size; ++i) {
+		 Document doc = documents.get(i);
+		 № регистрации = \Document\Report_form_number, если \Document\Report_form_number = is Null, то \Document\Report_form_number = "б/н"
+		 Дата регистрации = \Document\Date_doc, если \Document\Date_doc= is Null, то \Document\Date_doc = \Delo\Date_end
+		 Краткое содержание = \Document\Doc_title
+		 Количество листов = считать количество страниц в прикрепленном PDF-файле
+		 Файлы = \Document\Graph
+		 Примечание = "\Document\Law_court_name"+" 
+		 \Document\Subject_name_RF" " \Document\Report_period"
+		 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
+		 Наименование вида = "Регламентная судебная статистика"
 
-			 № регистрации = «МЮ-б\н»"
-			 Дата регистрации = \Delo\Date_end
-			 Краткое содержание = \Document\Doc_title
-			 Количество листов = считать количество страниц в прикрепленном PDF-файле
-			 Файлы = \Document\Graph
-			 Примечание = "\Document\Law_court_name"+
-			 " \Document\Subject_name_RF" " \Document\Report_period"
-			 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
-			 Наименование вида = "судебная статистика"
+		 № регистрации = «МЮ-б\н»"
+		 Дата регистрации = \Delo\Date_end
+		 Краткое содержание = \Document\Doc_title
+		 Количество листов = считать количество страниц в прикрепленном PDF-файле
+		 Файлы = \Document\Graph
+		 Примечание = "\Document\Law_court_name"+
+		 " \Document\Subject_name_RF" " \Document\Report_period"
+		 " \Document\Report_type", если какой-либо из индексов пустой, значит ничего и не кладем
+		 Наименование вида = "судебная статистика"
 
-			 № регистрации = «МЮ-б\н»"
-			 Дата регистрации = 31.12.1998
-			 Краткое содержание = \Document\Doc_title
-			 Количество листов = считать количество страниц в прикрепленном PDF-файле
-			 Файлы = \Document\Graph
-			 Наименование вида = "обзоры_доклады" 
-			 */
-			String regNumber;
-			Calendar date;
-			String remark;
-			String type; 
-			if (mode.equals(Config.MODE_1)) {
-			} else {
-			}
-			switch (mode) {
-				case Config.MODE_1:
-					regNumber = doc.getReportFormNumber();
-					date = doc.getDate();
-					if (date == null) {
-						date = delo.getEndDate();
-					}
-					type = "Регламентная судебная статистика";
-					remark = doc.getLawCourtName() + doc.getSubjectNameRF() + doc.getReportPeriod() + doc.getReportType();
-					break;
-				case Config.MODE_2:
-					regNumber = "МЮ-б\\н";
-					date = delo.getEndDate();
-					type = "судебная статистика";
-					remark = doc.getLawCourtName() + doc.getSubjectNameRF() + doc.getReportPeriod() + doc.getReportType();
-					break;
-				case Config.MODE_3:
-					regNumber = "МЮ-б\\н";
-					date = Calendar.getInstance();
-					date.set(1998, 11, 31);
-					type = "обзоры_доклады";
-					remark = "";
-					break;
-				default:
-					throw new WrongModeException("Неправильный режим работы: " + mode);
-			}
-			String docGraph = getPdfLink(doc.getGraph());
+		 № регистрации = «МЮ-б\н»"
+		 Дата регистрации = 31.12.1998
+		 Краткое содержание = \Document\Doc_title
+		 Количество листов = считать количество страниц в прикрепленном PDF-файле
+		 Файлы = \Document\Graph
+		 Наименование вида = "обзоры_доклады" 
+		 */
+		/*
+		 String regNumber;
+		 Calendar date;
+		 String remark;
+		 String type; 
+		 if (mode.equals(Config.MODE_1)) {
+		 } else {
+		 }
+		 switch (mode) {
+		 case Config.MODE_1:
+		 regNumber = doc.getReportFormNumber();
+		 date = doc.getDate();
+		 if (date == null) {
+		 date = delo.getEndDate();
+		 }
+		 type = "Регламентная судебная статистика";
+		 remark = doc.getLawCourtName() + doc.getSubjectNameRF() + doc.getReportPeriod() + doc.getReportType();
+		 break;
+		 case Config.MODE_2:
+		 regNumber = "МЮ-б\\н";
+		 date = delo.getEndDate();
+		 type = "судебная статистика";
+		 remark = doc.getLawCourtName() + doc.getSubjectNameRF() + doc.getReportPeriod() + doc.getReportType();
+		 break;
+		 case Config.MODE_3:
+		 regNumber = "МЮ-б\\н";
+		 date = Calendar.getInstance();
+		 date.set(1998, 11, 31);
+		 type = "обзоры_доклады";
+		 remark = "";
+		 break;
+		 default:
+		 throw new WrongModeException("Неправильный режим работы: " + mode);
+		 }
+		 String docGraph = getPdfLink(doc.getGraph());
 
-			createDocRecord(sheet.createRow(rowNumber++), new Document(regNumber,
-					date, doc.getTitle(), countPages(docGraph), docGraph, remark, type));
-			++stat.docs;
-		}
+		 createDocRecord(sheet.createRow(rowNumber++), new Document(regNumber,
+		 date, doc.getTitle(), countPages(docGraph), docGraph, remark, type));
+		 ++stat.docs;
+		 }
+		 */
 		return rowNumber;
 	}
 
@@ -502,8 +503,9 @@ public class Worker extends Thread {
 	 * @return в случае правильного оформления - true, иначе - false
 	 */
 	private boolean checkDelo(Delo delo) {
-		if (mode.equals(Config.MODE_3))
+		if (mode == ConvertMode.REVIEW_REPORT || mode == ConvertMode.ORDERS) {
 			return true;
+		}
 		Set<ConstraintViolation<Delo>> errors = validator.validate(delo);
 		boolean valid = errors.isEmpty();
 		StringBuilder builder = null;
@@ -512,6 +514,17 @@ public class Worker extends Thread {
 					.format("Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
 			for (ConstraintViolation<Delo> error : errors) {
 				builder.append("\t").append(error.getMessage());
+			}
+		}
+
+		if (mode == ConvertMode.CRIME_INOSTR || mode == ConvertMode.CRIME_ZARUB) {
+			if (delo.getTom() == null) {
+				valid = false;
+				if (builder == null) {
+					builder = new StringBuilder(String.format(
+							"Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
+				}
+				builder.append("\tНомер тома отсутствует");
 			}
 		}
 

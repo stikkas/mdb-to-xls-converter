@@ -33,13 +33,7 @@ public class Document implements Serializable {
 
 	private String title;
 
-	private String pages;
-
 	private String graph;
-
-	private String remark;
-
-	private String type;
 
 	private String lawCourtName;
 
@@ -50,17 +44,6 @@ public class Document implements Serializable {
 	private String reportType;
 
 	public Document() {
-	}
-
-	public Document(String reportFormNumber, Calendar date, String title,
-			String pages, String graph, String remark, String type) {
-		this.reportFormNumber = reportFormNumber;
-		this.date = date;
-		this.title = title;
-		this.pages = pages;
-		this.graph = graph;
-		this.remark = remark;
-		this.type = type;
 	}
 
 	@Id
@@ -115,15 +98,6 @@ public class Document implements Serializable {
 		this.title = title;
 	}
 
-	@Column(name="Doc_number", insertable = false, updatable = false)
-	public String getPages() {
-		return pages;
-	}
-
-	public void setPages(String pages) {
-		this.pages = pages;
-	}
-
 	@Column(name = "Graph", insertable = false, updatable = false)
 	public String getGraph() {
 		return graph;
@@ -131,26 +105,6 @@ public class Document implements Serializable {
 
 	public void setGraph(String graph) {
 		this.graph = graph;
-	}
-
-	@Column(name = "Report_type", insertable = false, updatable = false)
-	public String getRemark() {
-		return remark;
-	}
-
-	public void setRemark(String remark) {
-		this.remark = remark;
-	}
-
-	@Column(name = "Report_type", insertable = false, updatable = false)
-	public String getType() {
-		if (type == null)
-			return "";
-		return type;
-	}
-
-	public void setType(String type) {
-		this.type = type;
 	}
 
 	@Column(name = "Report_type", insertable = false, updatable = false)
@@ -215,5 +169,4 @@ public class Document implements Serializable {
 		final Document other = (Document) obj;
 		return Objects.equals(id, other.id);
 	}
-
 }

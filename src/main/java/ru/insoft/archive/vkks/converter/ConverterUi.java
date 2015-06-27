@@ -15,7 +15,7 @@ import ru.insoft.archive.vkks.converter.control.ConverterController;
  */
 public class ConverterUi extends Application {
 
-	private final static String TITLE = "Конвертор МИНЮСТ (Поиск по Case_barcod)";
+	private final static String TITLE = "Конвертор МИНЮСТ";
 	private Stage stage;
 
 	@Override

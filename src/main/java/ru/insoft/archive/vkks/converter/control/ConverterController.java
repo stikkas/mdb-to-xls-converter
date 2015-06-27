@@ -18,6 +18,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.stage.FileChooser;
 import ru.insoft.archive.vkks.converter.Config;
+import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.ConverterUi;
 import ru.insoft.archive.vkks.converter.Worker;
 
@@ -58,7 +59,7 @@ public class ConverterController {
 	private Button cancelButton;
 
 	@FXML
-	private ComboBox<String> modeBox;
+	private ComboBox<ConvertMode> modeBox;
 
 	/**
 	 * Запуск конвертации
@@ -72,8 +73,7 @@ public class ConverterController {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
 					+ "].\n");
 
-			String mode = modeBox.getValue();
-			Worker w = new Worker(dbFileEdit.getText(), logPanel, mode);
+			Worker w = new Worker(dbFileEdit.getText(), logPanel, modeBox.getValue());
 
 			runningWorkers.put(dbFile, w);
 			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
@@ -168,9 +168,8 @@ public class ConverterController {
 			cancelButton.setDisable(countWorkers.get().get() <= 0);
 		});
 
-
-		modeBox.getItems().addAll(Config.MODE_1, Config.MODE_2, Config.MODE_3);
-		modeBox.setValue(Config.MODE_1);
+		modeBox.getItems().addAll(ConvertMode.values());
+		modeBox.setValue(modeBox.getItems().get(0));
 	}
 
 	public void setApp(ConverterUi app) {
