@@ -190,13 +190,15 @@ public class Worker extends Thread {
 			setHeaders(Config.docHeaders, wb, sheet);
 		}
 
-		if (!(mode == ConvertMode.CRIME_ZARUB || mode == ConvertMode.CRIME_INOSTR 
-				|| mode == ConvertMode.INSTRUCTIONS || mode == ConvertMode.ORDERS)) {
+		if (!(mode == ConvertMode.CRIME_ZARUB || mode == ConvertMode.CRIME_INOSTR
+				|| mode == ConvertMode.INSTRUCTIONS || mode == ConvertMode.PUBLICATIONS)) {
 			String deloGraph = delo.getGraph();
 			if (deloGraph != null && !deloGraph.trim().isEmpty()) {
 				createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createTiltePageDelo(delo));
 			}
+		}
 
+		if (mode != ConvertMode.ORDERS) {
 			for (Document doc : delo.getDocuments()) {
 				createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createXLSDocument(delo, doc));
 				++stat.docs;
@@ -268,7 +270,6 @@ public class Worker extends Thread {
 			cell.setCellStyle(style);
 		}
 	}
-
 
 	/**
 	 * Пишет информацию о ходе выполнения в статустую панель.

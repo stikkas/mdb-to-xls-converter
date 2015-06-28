@@ -1,7 +1,6 @@
 package ru.insoft.archive.vkks.converter.buillders;
 
 import com.itextpdf.text.pdf.PdfReader;
-import com.sun.org.apache.xerces.internal.util.DOMUtil;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Calendar;
@@ -65,6 +64,15 @@ public class XLSEntityBuilder {
 		this.workDir = workDir;
 	}
 
+	/**
+	 * Создает запись о документе. В режимах ORDERS не используется
+	 *
+	 * @param delo дело из mdb
+	 * @param doc документ из mdb
+	 * @return данные для размещения в xls файле на странице "Документы"
+	 * @throws ru.insoft.archive.vkks.converter.error.WrongModeException
+	 * @throws ru.insoft.archive.vkks.converter.error.WrongPdfFile
+	 */
 	/*
 	 № регистрации = \Document\Report_form_number, если \Document\Report_form_number = is Null, то \Document\Report_form_number = "б/н"
 	 Дата регистрации = \Document\Date_doc, если \Document\Date_doc= is Null, то \Document\Date_doc = \Delo\Date_end
@@ -93,8 +101,39 @@ public class XLSEntityBuilder {
 	 Файлы = \Document\Graph
 	 Наименование вида = "обзоры_доклады" 
 
+	 № регистрации = "б/н"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = «Брошюра со сведениями о состоянии преступности и результатах оперативно-служебной деятельности»
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Document\Graph
+	 Наименование вида = "Состояние преступности»"
+
+	 № регистрации = "б/н"
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = «Брошюра со сведениями о преступности и судимости в РФ и её субъектах»
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле
+	 Файлы = \Document\Graph
+	 Наименование вида = "«Преступность и правонарушения»
+
+	 № регистрации = "б/н"
+	 Дата регистрации = \Document\Date_doc
+	 Краткое содержание = \Document Doc_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле \Document\Graph
+	 Файлы = \Document\Graph
+	 Наименование вида = "«Инструкция»
+	 Если к записи о томе дела был прикреплен файл со сканобразом 
+	 (\Delo\Graph_delo = is NOT Null), то файл прикрепляем к карточке соответствующего документа
+
+	 № регистрации = 1
+	 Дата регистрации = \Delo\Date_end
+	 Краткое содержание = \Document \Doc_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле \Document\Graph
+	 Файлы = \Document\Graph
+	 Наименование вида = "«Брошюра»
+	 Если к записи о деле был прикреплен сканобраз, то прикрепить его к записи о документе, т.е.
+	 Файлы = \Document \Graph и \Delo\Graph_delo
 	 */
-	public XLSDocument createXLSDocument(Delo delo, Document doc) throws WrongPdfFile {
+	public XLSDocument createXLSDocument(Delo delo, Document doc) throws WrongPdfFile, WrongModeException {
 		switch (mode) {
 			case CRIME_ZARUB:
 			case CRIME_INOSTR:
@@ -106,8 +145,50 @@ public class XLSEntityBuilder {
 				return getDocument("МЮ-б\\н", delo, doc, "судебная статистика");
 			case REVIEW_REPORT:
 				return getDocument("МЮ-б\\н", doc, 1998, 11, 31, "обзоры_доклады");
+			case CRIME_STATUS_RU:
+				return getDocument("б/н", delo, doc, "Брошюра со сведениями о состоянии "
+						+ "преступности и результатах оперативно-служебной деятельности",
+						"Состояние преступности");
+			case CRIME_AND_DELICT:
+				return getDocument("б/н", delo, doc, "Брошюра со сведениями о "
+						+ "преступности и судимости в РФ и её субъектах",
+						"Преступность и правонарушения");
+			case INSTRUCTIONS:
+				return getDocument("б/н", doc, delo, "Инструкция");
+			case PUBLICATIONS:
+				return getDocument(delo, doc, "Брошюра");
+			default: // ORDERS
+				throw new WrongModeException("Для режима '" + mode + "' не определено создание документа");
 		}
-		return null;
+	}
+
+	private XLSDocument getDocument(Delo delo, Document doc, String vidName) throws WrongPdfFile {
+		String pdfLink = getPdfLink(doc.getGraph());
+		String graph = pdfLink;
+		String deloPdfLink = getPdfLink(delo.getGraph());
+		if (deloPdfLink != null && !deloPdfLink.trim().isEmpty()) {
+			graph += ";" + deloPdfLink;
+		}
+		return new XLSDocument("1", delo.getEndDate(), doc.getTitle(),
+				countPages(pdfLink), graph, vidName);
+	}
+
+	private XLSDocument getDocument(String regNumber, Document doc, Delo delo, String vidName) throws WrongPdfFile {
+		String pdfLink = getPdfLink(doc.getGraph());
+		String graph = pdfLink;
+		String deloPdfLink = getPdfLink(delo.getGraph());
+		if (deloPdfLink != null && !deloPdfLink.trim().isEmpty()) {
+			graph += ";" + deloPdfLink;
+		}
+		return new XLSDocument(regNumber, doc.getDate(), doc.getTitle(),
+				countPages(pdfLink), graph, vidName);
+	}
+
+	private XLSDocument getDocument(String regNumber, Delo delo, Document doc,
+			String shortContent, String vidName) throws WrongPdfFile {
+		String pdfLink = getPdfLink(doc.getGraph());
+		return new XLSDocument(regNumber, delo.getEndDate(), shortContent,
+				countPages(pdfLink), pdfLink, vidName);
 	}
 
 	private XLSDocument getDocument(Delo delo, Document doc, String shortContent, String vidName) {
@@ -130,9 +211,9 @@ public class XLSEntityBuilder {
 	private XLSDocument getDocument(String regNumber, Delo delo, Document doc, String vidName) throws WrongPdfFile {
 		String pdfLink = getPdfLink(doc.getGraph());
 		return new XLSDocument(regNumber, delo.getEndDate(), doc.getTitle(),
-				countPages(pdfLink), pdfLink, doc.getLawCourtName()
+				countPages(pdfLink), doc.getLawCourtName()
 				+ doc.getSubjectNameRF() + doc.getReportPeriod()
-				+ doc.getReportType(), vidName);
+				+ doc.getReportType(), pdfLink, vidName);
 	}
 
 	private XLSDocument getDocument(Document doc, Delo delo, String vidName) throws WrongPdfFile {
@@ -142,9 +223,9 @@ public class XLSEntityBuilder {
 		}
 		String pdfLink = getPdfLink(doc.getGraph());
 		return new XLSDocument(doc.getReportFormNumber(), date, doc.getTitle(),
-				countPages(pdfLink), pdfLink, doc.getLawCourtName()
+				countPages(pdfLink), doc.getLawCourtName()
 				+ doc.getSubjectNameRF() + doc.getReportPeriod()
-				+ doc.getReportType(), vidName);
+				+ doc.getReportType(), pdfLink, vidName);
 	}
 	/*
 	 Индекс дела = «1-4" + «значение года из \Delo\Date_end»
@@ -198,6 +279,7 @@ public class XLSEntityBuilder {
 	 № тома = 1
 	 Дата дела с = \Delo\Date_start
 	 Дата дела по = \Delo\Date_end
+
 	 */
 
 	public XLSDelo createXLSDelo(Delo delo) {
@@ -229,7 +311,7 @@ public class XLSEntityBuilder {
 
 	/**
 	 * Создает титульный лист для дела. В режимах CRIME_ZARUB, INSTRUCTIONS,
-	 * ORDERS и CRIME_INOSTR не используется
+	 * CRIME_INOSTR, PUBLICATIONS не используется
 	 *
 	 * @param delo дело из mdb
 	 * @return данные для размещения в xls файле на странице "Документы"
@@ -275,7 +357,15 @@ public class XLSEntityBuilder {
 	 Файлы = \Delo\Graph_delo
 	 Наименование вида = "Титульный лист"
 
-	
+	 № регистрации = \Delo\Number_tom
+	 Дата регистрации = \Delo\Date_start
+	 Краткое содержание = \Delo\Delo_title
+	 Количество листов = считать количество страниц в прикрепленном PDF-файле \Delo\Graph_delo
+	 Файлы = \Delo\Graph_delo
+	 Наименование вида = «Приказ и приложения»
+	 Если к записи о деле, на основе которой мы сформировали запись о документе, 
+	 были прикреплены записи о документах и содержали сканобразы, то прикрепить сканобразы к сформированной записи о документе, т.е.
+	 Файлы = \Delo\Graph_delo и все из подчинённых \Document \Graph
 	 */
 	public XLSDocument createTiltePageDelo(Delo delo) throws WrongModeException, WrongPdfFile {
 		switch (mode) {
@@ -287,11 +377,24 @@ public class XLSEntityBuilder {
 			case CRIME_STATUS_RU:
 			case CRIME_AND_DELICT:
 				return getTitlePage(delo, "Титульный лист", "Титульный лист");
-			case PUBLICATIONS:
-				return null;
+			case ORDERS:
+				return getTitlePage(delo, "Приказ и приложения");
 			default:
 				throw new WrongModeException("Для режима '" + mode + "' не определено создание титульного листа");
 		}
+	}
+
+	private XLSDocument getTitlePage(Delo delo, String vidName) throws WrongPdfFile {
+		String pdfLink = getPdfLink(delo.getGraph());
+		final String[] graph = new String[]{pdfLink};
+		delo.getDocuments().forEach(doc -> {
+			String link = getPdfLink(doc.getGraph());
+			if (link != null && !link.trim().isEmpty()) {
+				graph[0] += ";" + link;
+			}
+		});
+		return new XLSDocument(delo.getTom().toString(), delo.getStartDate(),
+				delo.getTitle(), countPages(pdfLink), graph[0], vidName);
 	}
 
 	private XLSDocument getTitlePage(Delo delo, String shortContent,
