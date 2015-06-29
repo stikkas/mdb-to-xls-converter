@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>ru.insoft.archive</groupId>
 	<artifactId>mdb-to-xml-converter</artifactId>
-	<version>0.0.7</version>
+	<version>0.0.8</version>
 	<packaging>jar</packaging>
 	<description>Конверт для МИНЮСТа. Используется Стат. Отчеты mdb</description>
 	<dependencies>

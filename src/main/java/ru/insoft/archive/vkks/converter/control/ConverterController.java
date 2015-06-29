@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.prefs.Preferences;
+import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
@@ -21,6 +22,7 @@ import ru.insoft.archive.vkks.converter.Config;
 import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.ConverterUi;
 import ru.insoft.archive.vkks.converter.Worker;
+import ru.insoft.archive.vkks.converter.error.WrongModeException;
 
 /**
  *
@@ -73,15 +75,20 @@ public class ConverterController {
 			logPanel.insertText(0, "Запускается обработка файла [" + dbFile
 					+ "].\n");
 
-			Worker w = new Worker(dbFileEdit.getText(), logPanel, modeBox.getValue());
+			Worker w;
+			try {
+				w = new Worker(dbFileEdit.getText(), logPanel, modeBox.getValue());
 
-			runningWorkers.put(dbFile, w);
-			countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
-			w.doneProperty().addListener(e -> {
-				countWorkers.set(new AtomicInteger(countWorkers.get().decrementAndGet()));
-				runningWorkers.remove(dbFile);
-			});
-			w.start();
+				runningWorkers.put(dbFile, w);
+				countWorkers.set(new AtomicInteger(countWorkers.get().incrementAndGet()));
+				w.doneProperty().addListener(e -> {
+					countWorkers.set(new AtomicInteger(countWorkers.get().decrementAndGet()));
+					runningWorkers.remove(dbFile);
+				});
+				w.start();
+			} catch (WrongModeException ex) {
+				Platform.runLater(() -> logPanel.insertText(0, ex.getMessage() + "\n"));
+			}
 		}
 	}
 

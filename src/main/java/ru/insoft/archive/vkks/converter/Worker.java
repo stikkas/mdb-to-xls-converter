@@ -22,7 +22,6 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import static ru.insoft.archive.vkks.converter.Config.dbPrefix;
 import ru.insoft.archive.vkks.converter.domain.Delo;
-import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.error.ErrorCreateXlsFile;
 import ru.insoft.archive.vkks.converter.error.WrongModeException;
 import javafx.application.Platform;
@@ -30,10 +29,10 @@ import javax.validation.ConstraintViolation;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Font;
 import ru.insoft.archive.vkks.converter.buillders.QueryBuilder;
-import ru.insoft.archive.vkks.converter.buillders.XLSEntityBuilder;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
 import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
+import ru.insoft.archive.vkks.converter.service.Service;
 
 /**
  * Обрабатывает xls файлы, сопоставляя их с данными в базе. Также копирует pdf
@@ -45,7 +44,7 @@ public class Worker extends Thread {
 
 	private enum ValueType {
 
-		STRING, INTEGER, CALENDAR, CALENDAR1
+		STRING, INTEGER, CALENDAR
 	}
 
 	private boolean commit = false;
@@ -64,9 +63,9 @@ public class Worker extends Thread {
 	private static final javax.validation.Validator validator
 			= Validation.buildDefaultValidatorFactory().getValidator();
 
-	private final XLSEntityBuilder entityBuilder;
+	private final Service xlsService;
 
-	public Worker(String accessDb, TextArea logPanel, ConvertMode mode) {
+	public Worker(String accessDb, TextArea logPanel, ConvertMode mode) throws WrongModeException {
 		this.xlsPathDir = Paths.get(accessDb).getParent();
 		this.xlsDir = xlsPathDir.toString();
 		this.logPanel = logPanel;
@@ -75,7 +74,9 @@ public class Worker extends Thread {
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
 		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
-		entityBuilder = new XLSEntityBuilder(mode, xlsPathDir);
+		xlsService = Service.getInstance(mode, xlsPathDir).orElseThrow(() -> {
+			return new WrongModeException("Не опеределен формирователь данных для режима: " + mode);
+		});
 	}
 
 	/**
@@ -120,7 +121,7 @@ public class Worker extends Thread {
 				try {
 					createDelo(d, deloSheet, wb, rowNumber++, createHeaders);
 				} catch (WrongPdfFile ex) {
-					updateInfo(ex.getMessage());
+					updateInfo("Дело " + d.getId() + " имеет ошибки: " + ex.getMessage());
 					continue;
 				}
 				createHeaders = false;
@@ -150,10 +151,10 @@ public class Worker extends Thread {
 			setHeaders(Config.deloHeaders, wb, delaSheet);
 		}
 
-		fillDeloSheet(delaSheet, entityBuilder.createXLSDelo(d), deloRowNumber);
+		fillDeloSheet(delaSheet, xlsService.getDelo(d), deloRowNumber);
 		Sheet sheet = wb.createSheet("Документы" + deloRowNumber);
 
-		fillDocsSheet(wb, sheet, 1, d, true);
+		fillDocsSheet(wb, sheet, 1, d);
 	}
 
 	/**
@@ -184,26 +185,30 @@ public class Worker extends Thread {
 	/**
 	 * Заполняет страницу документов
 	 */
-	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, Delo delo,
-			boolean createHeaders) throws WrongPdfFile, WrongModeException {
-		if (createHeaders) {
-			setHeaders(Config.docHeaders, wb, sheet);
+	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, Delo delo)
+			throws WrongPdfFile, WrongModeException {
+		setHeaders(Config.docHeaders, wb, sheet);
+		/*
+		 if (!(mode == ConvertMode.CRIME_ZARUB || mode == ConvertMode.CRIME_INOSTR
+		 || mode == ConvertMode.INSTRUCTIONS || mode == ConvertMode.PUBLICATIONS)) {
+		 String deloGraph = delo.getGraph();
+		 if (deloGraph != null && !deloGraph.trim().isEmpty()) {
+		 createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createTiltePageDelo(delo));
+		 }
+		 }
+
+		 if (mode != ConvertMode.ORDERS) {
+		 for (Document doc : delo.getDocuments()) {
+		 createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createXLSDocument(delo, doc));
+		 ++stat.docs;
+		 }
+		 }
+		 */
+		for (XLSDocument doc : xlsService.getDocuments(delo)) {
+			createDocRecord(sheet.createRow(rowNumber++), doc);
+			++stat.docs;
 		}
 
-		if (!(mode == ConvertMode.CRIME_ZARUB || mode == ConvertMode.CRIME_INOSTR
-				|| mode == ConvertMode.INSTRUCTIONS || mode == ConvertMode.PUBLICATIONS)) {
-			String deloGraph = delo.getGraph();
-			if (deloGraph != null && !deloGraph.trim().isEmpty()) {
-				createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createTiltePageDelo(delo));
-			}
-		}
-
-		if (mode != ConvertMode.ORDERS) {
-			for (Document doc : delo.getDocuments()) {
-				createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createXLSDocument(delo, doc));
-				++stat.docs;
-			}
-		}
 		return rowNumber;
 	}
 
@@ -221,8 +226,6 @@ public class Worker extends Thread {
 					break;
 				case CALENDAR:
 					cell.setCellType(Cell.CELL_TYPE_NUMERIC);
-					cell.setCellValue(Config.sdf.format(((Calendar) value).getTime()));
-				case CALENDAR1:
 					cell.setCellValue(Config.sdf.format(((Calendar) value).getTime()));
 			}
 		}
