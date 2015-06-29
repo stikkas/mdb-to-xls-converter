@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
@@ -18,8 +19,8 @@ import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
  */
 public class CrimeStatusRuService extends TraceTomNumbersService {
 
-	public CrimeStatusRuService(Path workDir) {
-		super(workDir);
+	public CrimeStatusRuService(ConvertMode mode, Path workDir) {
+		super(mode, workDir);
 	}
 
 	@Override

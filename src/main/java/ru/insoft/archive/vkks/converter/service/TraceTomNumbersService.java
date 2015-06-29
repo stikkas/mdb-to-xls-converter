@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
+import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 
 /**
@@ -11,7 +12,7 @@ import ru.insoft.archive.vkks.converter.domain.Delo;
  *
  * @author stikkas<stikkas@yandex.ru>
  */
-public abstract class TraceTomNumbersService extends Service {
+public abstract class TraceTomNumbersService extends LikeTitleService {
 
 	private final Map<DeloKey, Integer> tomNumbers = new HashMap<>();
 
@@ -65,8 +66,8 @@ public abstract class TraceTomNumbersService extends Service {
 		return number;
 	}
 
-	public TraceTomNumbersService(Path workDir) {
-		super(workDir);
+	public TraceTomNumbersService(ConvertMode mode, Path workDir) {
+		super(mode, workDir);
 	}
 
 }

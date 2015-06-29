@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.Calendar;
 import java.util.List;
 import java.util.stream.Collectors;
+import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
@@ -21,10 +22,10 @@ import ru.insoft.archive.vkks.converter.dto.XLSDocument;
  *
  * @author stikkas<stikkas@yandex.ru>
  */
-public class ForeignCrimeService extends Service {
+public class ForeignCrimeService extends LikeTitleService {
 
-	public ForeignCrimeService(Path workDir) {
-		super(workDir);
+	public ForeignCrimeService(ConvertMode mode, Path workDir) {
+		super(mode, workDir);
 	}
 
 	@Override

@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
@@ -14,10 +15,10 @@ import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
  *
  * @author stikkas<stikkas@yandex.ru>
  */
-public class OrdersService extends Service {
+public class OrdersService extends LikeTitleService {
 
-	public OrdersService(Path workDir) {
-		super(workDir);
+	public OrdersService(ConvertMode mode, Path workDir) {
+		super(mode, workDir);
 	}
 
 	@Override
@@ -45,7 +46,6 @@ public class OrdersService extends Service {
 		Calendar endDate = Calendar.getInstance();
 		endDate.set(1992, 11, 31);
 		return new XLSDelo("1-2-2Приказы", "Приказы", 1, startDate, endDate);
-
 	}
 
 }

@@ -21,11 +21,24 @@ public enum ConvertMode {
 	CRIME_AND_DELICT("1-1-7-СД-Преступность и правонарушения", "%Преступность и правонарушения%"),
 	INSTRUCTIONS("1-2-2-Инструкции", "%Инструкция%"),
 	ORDERS("1-2-2-Приказы", "%Приказ%"),
-	PUBLICATIONS("1-3-Публикации", Arrays.asList(79611));
+	PUBLICATIONS("1-3-Публикации", Arrays.asList(79611)),
+	MATERIALS("1-1-4", Arrays.asList(79217, 79598)),
+	RECOMENDATIONS("1-2-2-Рекомендации", Arrays.asList(79291)),
+	COMPARE_TABLE("1-2-2-Сравнительная таблица статей УК", Arrays.asList(79515)),
+	SVEDENIA("1-1-2-Сведения", "%сведения%", Arrays.asList(79610)),
+	LAW_PRACTIKA("1-1-7-Судебная практика", Arrays.asList(79610)),
+	ANALITIC_TABLES("1-1-3-Аналитические таблицы", Arrays.asList(79525, 79469, 79595)),
+	BILLS_REG_FORMS("1-2-1-Бланки регламентных форм", Arrays.asList(79554, 79553));
 
 	private final String searchCriteria;
 	private final String displayName;
 	private final List<Integer> barCodes;
+
+	private ConvertMode(String displayName, String searchCriteria, List<Integer> barCodes) {
+		this.displayName = displayName;
+		this.searchCriteria = searchCriteria;
+		this.barCodes = barCodes;
+	}
 
 	private ConvertMode(String displayName, String searchCriteria) {
 		this.displayName = displayName;

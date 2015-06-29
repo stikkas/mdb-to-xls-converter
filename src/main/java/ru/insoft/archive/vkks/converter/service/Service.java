@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.persistence.EntityManager;
 import org.apache.commons.io.FilenameUtils;
 import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
@@ -37,10 +38,17 @@ public abstract class Service {
 		services.put(ConvertMode.INSTRUCTIONS, InstructionsService.class);
 		services.put(ConvertMode.ORDERS, OrdersService.class);
 		services.put(ConvertMode.PUBLICATIONS, PublicationsService.class);
+		services.put(ConvertMode.MATERIALS, MaterialsService.class);
+		services.put(ConvertMode.RECOMENDATIONS, RecomendationsService.class);
+		services.put(ConvertMode.COMPARE_TABLE, CompareTableService.class);
+		services.put(ConvertMode.SVEDENIA, SvedeniaService.class);
+		services.put(ConvertMode.LAW_PRACTIKA, LawPractikaService.class);
+		services.put(ConvertMode.ANALITIC_TABLES, AnaliticTablesService.class);
+		services.put(ConvertMode.BILLS_REG_FORMS, BillsRegFormsService.class);
 	}
 
 	protected final Path workDir;
-
+	protected final ConvertMode mode;
 	/**
 	 * Преобразует ссылку из базы данных в относительный путь к исходному файлу.
 	 * В базе данных ссылка представлена в Windows формате. Удаляются лишние
@@ -67,12 +75,14 @@ public abstract class Service {
 
 	/**
 	 * Определяет создавать или нет титульный лист
+	 *
 	 * @param link
-	 * @return 
+	 * @return
 	 */
 	protected boolean createTitle(String link) {
 		return (link != null && !link.trim().isEmpty());
 	}
+
 	/**
 	 * Подситываем кол-во страниц документов на входе получает относительный
 	 * путь к файлу в формате Windows
@@ -107,15 +117,16 @@ public abstract class Service {
 		return tom;
 	}
 
-	public Service(Path workDir) {
+	public Service(ConvertMode mode, Path workDir) {
 		this.workDir = workDir;
+		this.mode = mode;
 	}
 
 	public static Optional<Service> getInstance(ConvertMode mode, Path workDir) {
 		Optional<Service> object;
 		try {
-			Constructor<? extends Service> ctor = services.get(mode).getConstructor(Path.class);
-			object = Optional.of(ctor.newInstance(workDir));
+			Constructor<? extends Service> ctor = services.get(mode).getConstructor(ConvertMode.class, Path.class);
+			object = Optional.of(ctor.newInstance(mode, workDir));
 		} catch (NullPointerException | NoSuchMethodException | SecurityException | InstantiationException |
 				IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
 			object = Optional.empty();
@@ -140,4 +151,12 @@ public abstract class Service {
 	 * @return запись для XLS файла
 	 */
 	public abstract XLSDelo getDelo(Delo delo);
+
+	/**
+	 * Получает список дел из mdb файла
+	 *
+	 * @param em EntityManager для выбранного mdb файла
+	 * @return список дел
+	 */
+	public abstract List<Delo> getDelos(EntityManager em);
 }

@@ -43,6 +43,8 @@ public class Document implements Serializable {
 
 	private String reportType;
 
+	private String reportYear;
+
 	public Document() {
 	}
 
@@ -149,6 +151,15 @@ public class Document implements Serializable {
 
 	public void setReportPeriod(String reportPeriod) {
 		this.reportPeriod = reportPeriod;
+	}
+
+	@Column(name = "Report_year", insertable = false, updatable = false)
+	public String getReportYear() {
+		return reportYear;
+	}
+
+	public void setReportYear(String reportYear) {
+		this.reportYear = reportYear;
 	}
 
 	@Override

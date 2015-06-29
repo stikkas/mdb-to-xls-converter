@@ -28,7 +28,6 @@ import javafx.application.Platform;
 import javax.validation.ConstraintViolation;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Font;
-import ru.insoft.archive.vkks.converter.buillders.QueryBuilder;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
 import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
@@ -89,9 +88,7 @@ public class Worker extends Thread {
 	@Override
 	public void run() {
 		try {
-			convertFewDelo(new QueryBuilder(em, mode).createQuery().getResultList());
-		} catch (WrongModeException ex) {
-			updateInfo(ex.getMessage());
+			convertFewDelo(xlsService.getDelos(em));
 		} finally {
 			updateInfo(stat.toString());
 			done.set(true);
@@ -106,7 +103,7 @@ public class Worker extends Thread {
 	 * @param fileName имя файла для записи данных
 	 * @return в случае сигнала прервать операцию возвращаем false
 	 */
-	private void convertFewDelo(List<Delo> dela) throws WrongModeException {
+	private void convertFewDelo(List<Delo> dela) {
 
 		Workbook wb = new HSSFWorkbook();
 		Sheet deloSheet = wb.createSheet("Дело");
@@ -146,7 +143,7 @@ public class Worker extends Thread {
 	 * Документы
 	 */
 	private void createDelo(Delo d, Sheet delaSheet, Workbook wb, int deloRowNumber,
-			boolean createHeaders) throws WrongModeException, WrongPdfFile {
+			boolean createHeaders) throws WrongPdfFile {
 		if (createHeaders) {
 			setHeaders(Config.deloHeaders, wb, delaSheet);
 		}
@@ -171,7 +168,7 @@ public class Worker extends Thread {
 	/**
 	 * Добавляет запись на лист "Дело"
 	 */
-	private void fillDeloSheet(Sheet sheet, XLSDelo delo, int rowNumber) throws WrongModeException {
+	private void fillDeloSheet(Sheet sheet, XLSDelo delo, int rowNumber) {
 		Row row = sheet.createRow(rowNumber);
 		setCellValue(row.createCell(0), delo.getIndex(), ValueType.STRING);
 		setCellValue(row.createCell(1), delo.getTitle(), ValueType.STRING);
@@ -185,31 +182,13 @@ public class Worker extends Thread {
 	/**
 	 * Заполняет страницу документов
 	 */
-	private int fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, Delo delo)
-			throws WrongPdfFile, WrongModeException {
+	private void fillDocsSheet(Workbook wb, Sheet sheet, int rowNumber, Delo delo)
+			throws WrongPdfFile {
 		setHeaders(Config.docHeaders, wb, sheet);
-		/*
-		 if (!(mode == ConvertMode.CRIME_ZARUB || mode == ConvertMode.CRIME_INOSTR
-		 || mode == ConvertMode.INSTRUCTIONS || mode == ConvertMode.PUBLICATIONS)) {
-		 String deloGraph = delo.getGraph();
-		 if (deloGraph != null && !deloGraph.trim().isEmpty()) {
-		 createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createTiltePageDelo(delo));
-		 }
-		 }
-
-		 if (mode != ConvertMode.ORDERS) {
-		 for (Document doc : delo.getDocuments()) {
-		 createDocRecord(sheet.createRow(rowNumber++), entityBuilder.createXLSDocument(delo, doc));
-		 ++stat.docs;
-		 }
-		 }
-		 */
 		for (XLSDocument doc : xlsService.getDocuments(delo)) {
 			createDocRecord(sheet.createRow(rowNumber++), doc);
 			++stat.docs;
 		}
-
-		return rowNumber;
 	}
 
 	/**
@@ -297,6 +276,15 @@ public class Worker extends Thread {
 		if (mode == ConvertMode.REVIEW_REPORT || mode == ConvertMode.ORDERS) {
 			return true;
 		}
+
+		if (mode == ConvertMode.ANALITIC_TABLES && !delo.getBarCode().equals(79595)) {
+			if (delo.getStartDate() == null) {
+				updateInfo(String.format("Дело с ID = %d не имеет начальной даты\n", delo.getId()));
+				return false;
+			}
+			return true;
+		}
+
 		Set<ConstraintViolation<Delo>> errors = validator.validate(delo);
 		boolean valid = errors.isEmpty();
 		StringBuilder builder = null;

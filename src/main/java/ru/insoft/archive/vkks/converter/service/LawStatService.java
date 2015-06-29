@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
@@ -16,10 +17,10 @@ import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
  *
  * @author stikkas<stikkas@yandex.ru>
  */
-public class LawStatService extends Service {
+public class LawStatService extends ByBarcodService {
 
-	public LawStatService(Path workDir) {
-		super(workDir);
+	public LawStatService(ConvertMode mode, Path workDir) {
+		super(mode, workDir);
 	}
 
 	@Override
