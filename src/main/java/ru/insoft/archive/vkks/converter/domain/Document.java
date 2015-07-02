@@ -35,16 +35,6 @@ public class Document implements Serializable {
 
 	private String graph;
 
-	private String lawCourtName;
-
-	private String subjectNameRF;
-
-	private String reportPeriod;
-
-	private String reportType;
-
-	private String reportYear;
-
 	public Document() {
 	}
 
@@ -81,7 +71,7 @@ public class Document implements Serializable {
 		this.reportFormNumber = reportFormNumber;
 	}
 
-	@Column(name="Date_doc", insertable = false, updatable = false)
+	@Column(name = "Date_doc", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getDate() {
 		return this.date;
@@ -91,7 +81,7 @@ public class Document implements Serializable {
 		this.date = date;
 	}
 
-	@Column(name="Doc_title", insertable = false, updatable = false)
+	@Column(name = "Doc_title", insertable = false, updatable = false)
 	public String getTitle() {
 		return title;
 	}
@@ -107,59 +97,6 @@ public class Document implements Serializable {
 
 	public void setGraph(String graph) {
 		this.graph = graph;
-	}
-
-	@Column(name = "Report_type", insertable = false, updatable = false)
-	public String getReportType() {
-		if (reportType == null)
-			return "";
-		return " " + reportType;
-	}
-
-	public void setReportType(String reportType) {
-		this.reportType = reportType;
-	}
-
-	@Column(name = "Law_court_name", insertable = false, updatable = false)
-	public String getLawCourtName() {
-		if (lawCourtName == null)
-			return "";
-		return lawCourtName;
-	}
-
-	public void setLawCourtName(String lawCourtName) {
-		this.lawCourtName = lawCourtName;
-	}
-
-	@Column(name = "Subject_name_RF", insertable = false, updatable = false)
-	public String getSubjectNameRF() {
-		if (subjectNameRF == null)
-			return "";
-		return " " + subjectNameRF;
-	}
-
-	public void setSubjectNameRF(String subjectNameRF) {
-		this.subjectNameRF = subjectNameRF;
-	}
-
-	@Column(name = "Report_period", insertable = false, updatable = false)
-	public String getReportPeriod() {
-		if (reportPeriod == null)
-			return "";
-		return " " + reportPeriod;
-	}
-
-	public void setReportPeriod(String reportPeriod) {
-		this.reportPeriod = reportPeriod;
-	}
-
-	@Column(name = "Report_year", insertable = false, updatable = false)
-	public String getReportYear() {
-		return reportYear;
-	}
-
-	public void setReportYear(String reportYear) {
-		this.reportYear = reportYear;
 	}
 
 	@Override

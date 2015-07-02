@@ -28,23 +28,7 @@ public abstract class Service {
 	private static final Map<ConvertMode, Class<? extends Service>> services = new HashMap<>();
 
 	static {
-		services.put(ConvertMode.CRIME_ZARUB, ForeignCrimeService.class);
-		services.put(ConvertMode.CRIME_INOSTR, ForeignCrimeService.class);
-		services.put(ConvertMode.LAW_STAT, LawStatService.class);
-		services.put(ConvertMode.METRIC_STAT_BIN, MetricStatBinService.class);
-		services.put(ConvertMode.REVIEW_REPORT, ReviewReportService.class);
-		services.put(ConvertMode.CRIME_STATUS_RU, CrimeStatusRuService.class);
-		services.put(ConvertMode.CRIME_AND_DELICT, CrimeDelictService.class);
-		services.put(ConvertMode.INSTRUCTIONS, InstructionsService.class);
-		services.put(ConvertMode.ORDERS, OrdersService.class);
-		services.put(ConvertMode.PUBLICATIONS, PublicationsService.class);
-		services.put(ConvertMode.MATERIALS, MaterialsService.class);
-		services.put(ConvertMode.RECOMENDATIONS, RecomendationsService.class);
-		services.put(ConvertMode.COMPARE_TABLE, CompareTableService.class);
-		services.put(ConvertMode.SVEDENIA, SvedeniaService.class);
-		services.put(ConvertMode.LAW_PRACTIKA, LawPractikaService.class);
-		services.put(ConvertMode.ANALITIC_TABLES, AnaliticTablesService.class);
-		services.put(ConvertMode.BILLS_REG_FORMS, BillsRegFormsService.class);
+		services.put(ConvertMode.CRIME_CAPITAL, CrimeCapitalService.class);
 	}
 
 	protected final Path workDir;

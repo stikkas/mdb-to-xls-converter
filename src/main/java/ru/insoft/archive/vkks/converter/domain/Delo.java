@@ -25,17 +25,9 @@ public class Delo implements Serializable {
 
 	private Integer id;
 
-	private Integer barCode;
-
 	private String title;
 
-	private Calendar startDate;
-
-	private Calendar endDate;
-
 	private Integer tom;
-
-	private String graph;
 
 	private List<Document> documents;
 
@@ -50,38 +42,6 @@ public class Delo implements Serializable {
 
 	public void setId(Integer id) {
 		this.id = id;
-	}
-
-	@Column(name = "Case_barcod", insertable = false, updatable = false)
-	public Integer getBarCode() {
-		return barCode;
-	}
-
-	public void setBarCode(Integer barCode){
-		this.barCode = barCode;
-	}
-
-	@NotNull(message = "начальная дата дела отсутствует")
-	@Column(name = "Date_start", insertable = false, updatable = false)
-	@Temporal(TemporalType.TIMESTAMP)
-	public Calendar getStartDate() {
-		return startDate;
-	}
-
-	
-	public void setStartDate(Calendar startDate) {
-		this.startDate = startDate;
-	}
-
-	@NotNull(message = "конечная дата дела отсутствует")
-	@Column(name = "Date_end", insertable = false, updatable = false)
-	@Temporal(TemporalType.TIMESTAMP)
-	public Calendar getEndDate() {
-		return endDate;
-	}
-
-	public void setEndDate(Calendar endDate) {
-		this.endDate = endDate;
 	}
 
 	@Column(name = "Delo_title", insertable = false, updatable = false)
@@ -99,16 +59,7 @@ public class Delo implements Serializable {
 	}
 
 	public void setTom(Integer tom) {
-		this.tom= tom;
-	}
-
-	@Column(name = "Graph_delo", insertable = false, updatable = false)
-	public String getGraph() {
-		return graph;
-	}
-
-	public void setGraph(String graph) {
-		this.graph = graph;
+		this.tom = tom;
 	}
 
 	@OneToMany(mappedBy = "delo", fetch = FetchType.EAGER)

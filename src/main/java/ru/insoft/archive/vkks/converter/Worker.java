@@ -6,9 +6,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Calendar;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
-import java.util.Set;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.control.TextArea;
@@ -25,9 +28,9 @@ import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.error.ErrorCreateXlsFile;
 import ru.insoft.archive.vkks.converter.error.WrongModeException;
 import javafx.application.Platform;
-import javax.validation.ConstraintViolation;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Font;
+import ru.insoft.archive.vkks.converter.domain.Document;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
 import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
@@ -109,22 +112,20 @@ public class Worker extends Thread {
 		Sheet deloSheet = wb.createSheet("Дело");
 		boolean createHeaders = true;
 		int rowNumber = 1;
-		for (Delo d : dela) {
+		for (Delo d : tuneDelas(dela)) {
 			if (commit) {
 				return;
 			}
 			++stat.cases;
-			if (checkDelo(d)) {
-				try {
-					createDelo(d, deloSheet, wb, rowNumber++, createHeaders);
-				} catch (WrongPdfFile ex) {
-					updateInfo("Дело " + d.getId() + " имеет ошибки: " + ex.getMessage());
-					continue;
-				}
-				createHeaders = false;
-				updateInfo("Создано дело с идентификатором " + d.getId());
-				++stat.casesCreated;
+			try {
+				createDelo(d, deloSheet, wb, rowNumber++, createHeaders);
+			} catch (WrongPdfFile ex) {
+				updateInfo("Дело " + d.getId() + " имеет ошибки: " + ex.getMessage());
+				continue;
 			}
+			createHeaders = false;
+			updateInfo("Создано дело с идентификатором " + d.getId());
+			++stat.casesCreated;
 		}
 
 		if (!dela.isEmpty()) {
@@ -136,6 +137,30 @@ public class Worker extends Thread {
 		} else {
 			updateInfo("дела не найдены");
 		}
+	}
+
+	/**
+	 * Немножко поколдуем
+	 *
+	 * @param dela
+	 * @return
+	 */
+	private Collection<Delo> tuneDelas(List<Delo> dela) {
+		Map<Key, Delo> map = new HashMap<>();
+		for (Delo d : dela) {
+			List<Document> docs = d.getDocuments();
+			for (Document doc : docs) {
+				doc.setReportFormNumber(d.getTom().toString());
+			}
+			Key key = new Key(d.getTitle(), docs.get(0).getDate().get(Calendar.YEAR));
+			Delo newdelo = map.get(key);	
+			if (newdelo == null) {
+				map.put(key, d);
+			} else {
+				newdelo.getDocuments().addAll(docs);
+			}
+		}
+		return map.values();
 	}
 
 	/**
@@ -266,50 +291,33 @@ public class Worker extends Thread {
 		return done;
 	}
 
-	/**
-	 * Проверяет правильность оформления дела
-	 *
-	 * @param delo интересуемое дело
-	 * @return в случае правильного оформления - true, иначе - false
-	 */
-	private boolean checkDelo(Delo delo) {
-		if (mode == ConvertMode.REVIEW_REPORT || mode == ConvertMode.ORDERS) {
-			return true;
-		}
+}
 
-		if (mode == ConvertMode.ANALITIC_TABLES && !delo.getBarCode().equals(79595)) {
-			if (delo.getStartDate() == null) {
-				updateInfo(String.format("Дело с ID = %d не имеет начальной даты\n", delo.getId()));
-				return false;
-			}
-			return true;
-		}
+class Key {
 
-		Set<ConstraintViolation<Delo>> errors = validator.validate(delo);
-		boolean valid = errors.isEmpty();
-		StringBuilder builder = null;
-		if (!valid) {
-			builder = new StringBuilder(String
-					.format("Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
-			for (ConstraintViolation<Delo> error : errors) {
-				builder.append("\t").append(error.getMessage());
-			}
-		}
+	public final String title;
+	public final int year;
 
-		if (mode == ConvertMode.CRIME_INOSTR || mode == ConvertMode.CRIME_ZARUB) {
-			if (delo.getTom() == null) {
-				valid = false;
-				if (builder == null) {
-					builder = new StringBuilder(String.format(
-							"Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
-				}
-				builder.append("\tНомер тома отсутствует");
-			}
-		}
-
-		if (builder != null) {
-			updateInfo(builder.toString());
-		}
-		return valid;
+	public Key(String title, int year) {
+		this.title = title;
+		this.year = year;
 	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj != null && obj instanceof Key) {
+			Key other = (Key) obj;
+			return other.title.equals(title) && other.year == year;
+		}
+		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		int hash = 7;
+		hash = 97 * hash + Objects.hashCode(this.title);
+		hash = 97 * hash + this.year;
+		return hash;
+	}
+
 }
