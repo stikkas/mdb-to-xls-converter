@@ -35,6 +35,7 @@ public abstract class Service {
 		services.put(ConvertMode.REVIEW_REPORT, ReviewReportService.class);
 		services.put(ConvertMode.CRIME_STATUS_RU, CrimeStatusRuService.class);
 		services.put(ConvertMode.CRIME_AND_DELICT, CrimeDelictService.class);
+		services.put(ConvertMode.CRIME_AND_DELICT2, CrimeDelict2Service.class);
 		services.put(ConvertMode.INSTRUCTIONS, InstructionsService.class);
 		services.put(ConvertMode.ORDERS, OrdersService.class);
 		services.put(ConvertMode.PUBLICATIONS, PublicationsService.class);
@@ -45,6 +46,10 @@ public abstract class Service {
 		services.put(ConvertMode.LAW_PRACTIKA, LawPractikaService.class);
 		services.put(ConvertMode.ANALITIC_TABLES, AnaliticTablesService.class);
 		services.put(ConvertMode.BILLS_REG_FORMS, BillsRegFormsService.class);
+		services.put(ConvertMode.RABOTA_NAROD_LAW, RabotaNarodLawService.class);
+		services.put(ConvertMode.MAIN_CRITERIAS, MainCriteriaService.class);
+		services.put(ConvertMode.STATISTIC_DATA, StatisticDataService.class);
+		services.put(ConvertMode.ABOUT_FACES, AboutFacesService.class);
 	}
 
 	protected final Path workDir;

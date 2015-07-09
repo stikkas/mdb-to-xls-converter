@@ -25,6 +25,8 @@ public class Delo implements Serializable {
 
 	private Integer id;
 
+	private String titleYearOfCompletion;
+	private String titleYearOfCreation;
 	private Integer barCode;
 
 	private String title;
@@ -57,7 +59,7 @@ public class Delo implements Serializable {
 		return barCode;
 	}
 
-	public void setBarCode(Integer barCode){
+	public void setBarCode(Integer barCode) {
 		this.barCode = barCode;
 	}
 
@@ -68,7 +70,6 @@ public class Delo implements Serializable {
 		return startDate;
 	}
 
-	
 	public void setStartDate(Calendar startDate) {
 		this.startDate = startDate;
 	}
@@ -99,7 +100,7 @@ public class Delo implements Serializable {
 	}
 
 	public void setTom(Integer tom) {
-		this.tom= tom;
+		this.tom = tom;
 	}
 
 	@Column(name = "Graph_delo", insertable = false, updatable = false)
@@ -120,4 +121,25 @@ public class Delo implements Serializable {
 		this.documents = documents;
 	}
 
+	@Column(name = "Delo_title_year_of_completion", insertable = false, updatable = false)
+	public String getTitleYearOfCompletion() {
+		if (titleYearOfCompletion == null)
+			return "";
+		return titleYearOfCompletion;
+	}
+
+	public void setTitleYearOfCompletion(String titleYearOfCompletion) {
+		this.titleYearOfCompletion = titleYearOfCompletion;
+	}
+
+	@Column(name = "Delo_title_year_of_creation", insertable = false, updatable = false)
+	public String getTitleYearOfCreation() {
+		if (titleYearOfCreation == null)
+			return "";
+		return titleYearOfCreation;
+	}
+
+	public void setTitleYearOfCreation(String titleYearOfCreation) {
+		this.titleYearOfCreation = titleYearOfCreation;
+	}
 }

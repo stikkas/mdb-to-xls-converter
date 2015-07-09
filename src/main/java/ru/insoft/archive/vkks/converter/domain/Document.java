@@ -44,6 +44,8 @@ public class Document implements Serializable {
 	private String reportType;
 
 	private String reportYear;
+	private String dataForm;
+	private String docNumber;
 
 	public Document() {
 	}
@@ -70,8 +72,7 @@ public class Document implements Serializable {
 
 	@Column(name = "Report_form_number", insertable = false, updatable = false)
 	public String getReportFormNumber() {
-		String temp = reportFormNumber;
-		if (temp == null || temp.trim().isEmpty()) {
+		if (reportFormNumber == null || reportFormNumber.trim().isEmpty()) {
 			return "б/н";
 		}
 		return reportFormNumber;
@@ -81,7 +82,7 @@ public class Document implements Serializable {
 		this.reportFormNumber = reportFormNumber;
 	}
 
-	@Column(name="Date_doc", insertable = false, updatable = false)
+	@Column(name = "Date_doc", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getDate() {
 		return this.date;
@@ -91,7 +92,7 @@ public class Document implements Serializable {
 		this.date = date;
 	}
 
-	@Column(name="Doc_title", insertable = false, updatable = false)
+	@Column(name = "Doc_title", insertable = false, updatable = false)
 	public String getTitle() {
 		return title;
 	}
@@ -111,8 +112,9 @@ public class Document implements Serializable {
 
 	@Column(name = "Report_type", insertable = false, updatable = false)
 	public String getReportType() {
-		if (reportType == null)
+		if (reportType == null) {
 			return "";
+		}
 		return " " + reportType;
 	}
 
@@ -122,8 +124,9 @@ public class Document implements Serializable {
 
 	@Column(name = "Law_court_name", insertable = false, updatable = false)
 	public String getLawCourtName() {
-		if (lawCourtName == null)
+		if (lawCourtName == null) {
 			return "";
+		}
 		return lawCourtName;
 	}
 
@@ -133,8 +136,9 @@ public class Document implements Serializable {
 
 	@Column(name = "Subject_name_RF", insertable = false, updatable = false)
 	public String getSubjectNameRF() {
-		if (subjectNameRF == null)
+		if (subjectNameRF == null) {
 			return "";
+		}
 		return " " + subjectNameRF;
 	}
 
@@ -142,10 +146,23 @@ public class Document implements Serializable {
 		this.subjectNameRF = subjectNameRF;
 	}
 
+	@Column(name = "Data_form", insertable = false, updatable = false)
+	public String getDataForm() {
+		if (dataForm == null) {
+			return "";
+		}
+		return dataForm;
+	}
+
+	public void setDataForm(String dataForm) {
+		this.dataForm = dataForm;
+	}
+
 	@Column(name = "Report_period", insertable = false, updatable = false)
 	public String getReportPeriod() {
-		if (reportPeriod == null)
+		if (reportPeriod == null) {
 			return "";
+		}
 		return " " + reportPeriod;
 	}
 
@@ -160,6 +177,15 @@ public class Document implements Serializable {
 
 	public void setReportYear(String reportYear) {
 		this.reportYear = reportYear;
+	}
+
+	@Column(name = "Doc_number", insertable = false, updatable = false)
+	public String getDocNumber() {
+		return docNumber;
+	}
+
+	public void setDocNumber(String docNumber) {
+		this.docNumber = docNumber;
 	}
 
 	@Override

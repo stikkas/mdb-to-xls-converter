@@ -273,7 +273,10 @@ public class Worker extends Thread {
 	 * @return в случае правильного оформления - true, иначе - false
 	 */
 	private boolean checkDelo(Delo delo) {
-		if (mode == ConvertMode.REVIEW_REPORT || mode == ConvertMode.ORDERS) {
+		if (mode == ConvertMode.REVIEW_REPORT || mode == ConvertMode.ORDERS
+				|| mode == ConvertMode.RABOTA_NAROD_LAW
+				|| mode == ConvertMode.MAIN_CRITERIAS || mode == ConvertMode.STATISTIC_DATA
+				|| mode == ConvertMode.ABOUT_FACES) {
 			return true;
 		}
 
