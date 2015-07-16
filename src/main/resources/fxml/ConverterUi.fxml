@@ -17,26 +17,15 @@
         </columnConstraints>
         <rowConstraints>
           <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-            <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
         </rowConstraints>
          <children>
             <Label text="МDB файл:" />
             <TextField fx:id="dbFileEdit" editable="false" promptText="Выберите файл с данными" GridPane.columnIndex="1" />
             <Button mnemonicParsing="false" onAction="#chooseDBFile" text="Выбрать" GridPane.columnIndex="2" />
-            <HBox spacing="20.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
-               <padding>
-                  <Insets top="2.0" />
-               </padding>
-               <children>
-                  <ComboBox fx:id="modeBox" prefHeight="26.0" HBox.hgrow="ALWAYS" />
-               </children>
-            </HBox>
-            <Label text="Режим:" GridPane.rowIndex="1" />
          </children>
       </GridPane>
       <Button fx:id="execButton" disable="true" layoutX="373.0" layoutY="251.0" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#onExec" prefWidth="114.0" text="Выполнить" AnchorPane.bottomAnchor="5.0" AnchorPane.rightAnchor="4.0" />
       <TextArea fx:id="logPanel" layoutX="176.0" layoutY="82.0" prefHeight="396.0" prefWidth="676.0" AnchorPane.bottomAnchor="40.0" AnchorPane.leftAnchor="5.0" AnchorPane.rightAnchor="5.0" AnchorPane.topAnchor="82.0" />
-      <Button fx:id="cancelButton" disable="true" layoutX="106.0" layoutY="487.0" mnemonicParsing="false" onAction="#onCancel" text="Прервать" AnchorPane.bottomAnchor="5.0" AnchorPane.leftAnchor="106.0" />
       <Button fx:id="saveLogButton" disable="true" layoutX="14.0" layoutY="487.0" mnemonicParsing="false" onAction="#onSaveLog" text="Сохранить" AnchorPane.bottomAnchor="5.0" AnchorPane.leftAnchor="5.0" />
    </children>
 </AnchorPane>

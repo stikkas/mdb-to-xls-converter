@@ -5,13 +5,10 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import javax.persistence.EntityManager;
 import org.apache.commons.io.FilenameUtils;
-import ru.insoft.archive.vkks.converter.ConvertMode;
 import ru.insoft.archive.vkks.converter.domain.Delo;
 import ru.insoft.archive.vkks.converter.dto.XLSDelo;
 import ru.insoft.archive.vkks.converter.dto.XLSDocument;
@@ -25,35 +22,7 @@ import ru.insoft.archive.vkks.converter.error.WrongPdfFile;
  */
 public abstract class Service {
 
-	private static final Map<ConvertMode, Class<? extends Service>> services = new HashMap<>();
-
-	static {
-		services.put(ConvertMode.CRIME_ZARUB, ForeignCrimeService.class);
-		services.put(ConvertMode.CRIME_INOSTR, ForeignCrimeService.class);
-		services.put(ConvertMode.LAW_STAT, LawStatService.class);
-		services.put(ConvertMode.METRIC_STAT_BIN, MetricStatBinService.class);
-		services.put(ConvertMode.REVIEW_REPORT, ReviewReportService.class);
-		services.put(ConvertMode.CRIME_STATUS_RU, CrimeStatusRuService.class);
-		services.put(ConvertMode.CRIME_AND_DELICT, CrimeDelictService.class);
-		services.put(ConvertMode.CRIME_AND_DELICT2, CrimeDelict2Service.class);
-		services.put(ConvertMode.INSTRUCTIONS, InstructionsService.class);
-		services.put(ConvertMode.ORDERS, OrdersService.class);
-		services.put(ConvertMode.PUBLICATIONS, PublicationsService.class);
-		services.put(ConvertMode.MATERIALS, MaterialsService.class);
-		services.put(ConvertMode.RECOMENDATIONS, RecomendationsService.class);
-		services.put(ConvertMode.COMPARE_TABLE, CompareTableService.class);
-		services.put(ConvertMode.SVEDENIA, SvedeniaService.class);
-		services.put(ConvertMode.LAW_PRACTIKA, LawPractikaService.class);
-		services.put(ConvertMode.ANALITIC_TABLES, AnaliticTablesService.class);
-		services.put(ConvertMode.BILLS_REG_FORMS, BillsRegFormsService.class);
-		services.put(ConvertMode.RABOTA_NAROD_LAW, RabotaNarodLawService.class);
-		services.put(ConvertMode.MAIN_CRITERIAS, MainCriteriaService.class);
-		services.put(ConvertMode.STATISTIC_DATA, StatisticDataService.class);
-		services.put(ConvertMode.ABOUT_FACES, AboutFacesService.class);
-	}
-
 	protected final Path workDir;
-	protected final ConvertMode mode;
 	/**
 	 * Преобразует ссылку из базы данных в относительный путь к исходному файлу.
 	 * В базе данных ссылка представлена в Windows формате. Удаляются лишние
@@ -122,16 +91,15 @@ public abstract class Service {
 		return tom;
 	}
 
-	public Service(ConvertMode mode, Path workDir) {
+	public Service(Path workDir) {
 		this.workDir = workDir;
-		this.mode = mode;
 	}
 
-	public static Optional<Service> getInstance(ConvertMode mode, Path workDir) {
+	public static Optional<Service> getInstance(Path workDir) {
 		Optional<Service> object;
 		try {
-			Constructor<? extends Service> ctor = services.get(mode).getConstructor(ConvertMode.class, Path.class);
-			object = Optional.of(ctor.newInstance(mode, workDir));
+			Constructor<? extends Service> ctor = CommonMinustService.class.getConstructor(Path.class);
+			object = Optional.of(ctor.newInstance(workDir));
 		} catch (NullPointerException | NoSuchMethodException | SecurityException | InstantiationException |
 				IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
 			object = Optional.empty();

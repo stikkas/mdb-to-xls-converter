@@ -46,6 +46,7 @@ public class Document implements Serializable {
 	private String reportYear;
 	private String dataForm;
 	private String docNumber;
+	private String category;
 
 	public Document() {
 	}
@@ -80,6 +81,15 @@ public class Document implements Serializable {
 
 	public void setReportFormNumber(String reportFormNumber) {
 		this.reportFormNumber = reportFormNumber;
+	}
+
+	@Column(name = "Category", insertable = false, updatable = false)
+	public String getCategory() {
+		return category;
+	}
+
+	public void setCategory(String category) {
+		this.category = category;
 	}
 
 	@Column(name = "Date_doc", insertable = false, updatable = false)

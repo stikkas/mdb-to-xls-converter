@@ -64,7 +64,7 @@ public class Delo implements Serializable {
 	}
 
 	@NotNull(message = "начальная дата дела отсутствует")
-	@Column(name = "Date_start", insertable = false, updatable = false)
+	@Column(name = "Date_start_", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getStartDate() {
 		return startDate;
@@ -75,7 +75,7 @@ public class Delo implements Serializable {
 	}
 
 	@NotNull(message = "конечная дата дела отсутствует")
-	@Column(name = "Date_end", insertable = false, updatable = false)
+	@Column(name = "Date_end_", insertable = false, updatable = false)
 	@Temporal(TemporalType.TIMESTAMP)
 	public Calendar getEndDate() {
 		return endDate;

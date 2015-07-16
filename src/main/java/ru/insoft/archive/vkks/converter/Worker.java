@@ -53,7 +53,6 @@ public class Worker extends Thread {
 	 */
 	private final BooleanProperty done = new SimpleBooleanProperty(false);
 
-	private final ConvertMode mode;
 	private final String xlsDir;
 	private final Path xlsPathDir;
 	private final EntityManager em;
@@ -64,17 +63,16 @@ public class Worker extends Thread {
 
 	private final Service xlsService;
 
-	public Worker(String accessDb, TextArea logPanel, ConvertMode mode) throws WrongModeException {
+	public Worker(String accessDb, TextArea logPanel) throws WrongModeException {
 		this.xlsPathDir = Paths.get(accessDb).getParent();
 		this.xlsDir = xlsPathDir.toString();
 		this.logPanel = logPanel;
-		this.mode = mode;
 
 		Properties props = new Properties();
 		props.put("javax.persistence.jdbc.url", dbPrefix + accessDb);
 		em = Persistence.createEntityManagerFactory("PU", props).createEntityManager();
-		xlsService = Service.getInstance(mode, xlsPathDir).orElseThrow(() -> {
-			return new WrongModeException("Не опеределен формирователь данных для режима: " + mode);
+		xlsService = Service.getInstance(xlsPathDir).orElseThrow(() -> {
+			return new WrongModeException("Ошибка создания сервиса");
 		});
 	}
 
@@ -129,7 +127,7 @@ public class Worker extends Thread {
 
 		if (!dela.isEmpty()) {
 			try {
-				writeData(wb, Paths.get(xlsDir, mode + ".xls"));
+				writeData(wb, Paths.get(xlsDir, "common_minust.xls"));
 			} catch (ErrorCreateXlsFile ex) {
 				updateInfo(ex.getMessage());
 			}
@@ -273,21 +271,8 @@ public class Worker extends Thread {
 	 * @return в случае правильного оформления - true, иначе - false
 	 */
 	private boolean checkDelo(Delo delo) {
-		if (mode == ConvertMode.REVIEW_REPORT || mode == ConvertMode.ORDERS
-				|| mode == ConvertMode.RABOTA_NAROD_LAW
-				|| mode == ConvertMode.MAIN_CRITERIAS || mode == ConvertMode.STATISTIC_DATA
-				|| mode == ConvertMode.ABOUT_FACES) {
-			return true;
-		}
-
-		if (mode == ConvertMode.ANALITIC_TABLES && !delo.getBarCode().equals(79595)) {
-			if (delo.getStartDate() == null) {
-				updateInfo(String.format("Дело с ID = %d не имеет начальной даты\n", delo.getId()));
-				return false;
-			}
-			return true;
-		}
-
+		return true;
+		/*
 		Set<ConstraintViolation<Delo>> errors = validator.validate(delo);
 		boolean valid = errors.isEmpty();
 		StringBuilder builder = null;
@@ -299,20 +284,10 @@ public class Worker extends Thread {
 			}
 		}
 
-		if (mode == ConvertMode.CRIME_INOSTR || mode == ConvertMode.CRIME_ZARUB) {
-			if (delo.getTom() == null) {
-				valid = false;
-				if (builder == null) {
-					builder = new StringBuilder(String.format(
-							"Дело с ID = %d имеет следующие ошибки:\n", delo.getId()));
-				}
-				builder.append("\tНомер тома отсутствует");
-			}
-		}
-
 		if (builder != null) {
 			updateInfo(builder.toString());
 		}
 		return valid;
+				*/
 	}
 }
